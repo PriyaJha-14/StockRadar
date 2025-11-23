@@ -1,33 +1,43 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-
+import {Ionicons} from "@expo/vector-icons";
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: "white",
         headerShown: false,
-        tabBarButton: HapticTab,
+        tabBarInactiveTintColor: "gray",
+        tabBarStyle: {
+          backgroundColor: "#0C0C0C",
+        }
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: "Market",
+          tabBarIcon: ({ color, size }) => <Ionicons size={size} name="stats-chart" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="watchlist"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: "Watchlist",
+          tabBarIcon: ({ color, size }) => <Ionicons size={size} name="star" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="ai-chat"
+        options={{
+          title: "AI Chat",
+          tabBarIcon: ({ color, size }) => <Ionicons size={size} name="chatbubble-ellipses" color={color} />,
         }}
       />
     </Tabs>

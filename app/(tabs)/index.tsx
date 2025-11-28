@@ -1,18 +1,22 @@
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { Platform, StyleSheet, View, Text, StatusBar, Pressable, ScrollView, ActivityIndicator } from 'react-native';
-import Carousel from "react-native-reanimated-carousel";
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { ActivityIndicator, Dimensions, Pressable, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import Carousel from "react-native-reanimated-carousel";
 import { blurhash } from "../../app/index";
 import { fetchMarketTickers } from '../api/marketApi';
-import { useQuery } from '@tanstack/react-query';
 
 
+const { width } = Dimensions.get("window");
+const chunkArray = (array: any[], size: number) => {
+  const chunks = [];
+
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size))
+  }
+  return chunks;
+}
 
 export default function HomeScreen() {
   const { data: recentStocksData, isPending: isLoadindRecentStocks } = useQuery({
@@ -94,9 +98,43 @@ export default function HomeScreen() {
                     />
                   </View>
                 ) : (
-                  <Text>{recentStocksData?.body.length}</Text>
-                )
-              }
+                  <Carousel
+                    loop={false}
+                    width={width - 32}
+                    height={100}
+                    data={chunkArray(recentStocksData?.body || [], 6)}
+                    scrollAnimationDuration={1000}
+                    renderItem={({ item: chunk }) => (
+                      <View className="flex-row flex-wrap">{chunk.map((stock: any) => {
+                        const isPositive = !stock.netchange.startsWith("-");
+                        return (
+                          <View key={stock.symbol}>
+                            <TouchableOpacity
+                              onPress={() => router.push(`/stock/${stock.symbol}`)}
+                            >
+                              <View className="flex-row items-center">
+
+                                <View className="w-10 h-10 rounded-full bg-white20 items-center justify-center mr-2">
+                                  <Text className="text-white text-lg">
+                                    {stock.symbol.charAt(0)}
+                                  </Text>
+                                </View>
+
+                              </View>
+
+                            </TouchableOpacity>
+
+                          </View>
+                        )
+                      })}</View>
+                    )}
+
+
+
+
+                  />
+                )}
+
 
             </View>
 

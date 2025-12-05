@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,10 +19,37 @@ const chunkArray = (array: any[], size: number) => {
   return chunks;
 }
 
+const topStocks = ["APPL", "GOOG", "MSFT", "AMZN", "TSLA"];
+
+const sortStocks = (stocks: any[]) => {
+  if (!stocks || !stocks.length) return [];
+
+  //First find all the top stocks
+
+  const topStocksItems: any[] = stocks.filter((stock) => topStocks.includes(stock.symbol.toUpperCase()));
+
+  // sort the tops stocks according to priority
+
+  const sortedTopStocks = topStocks.map((symbol: any) => topStocksItems.find((stock) => stock.symbol.toUpperCase() === symbol)).filter(Boolean);
+
+  const otherStocks = stocks.filter((stock) => !topStocks.includes(stock.symbol.toUpperCase()));
+
+  // Combine sorted tops stocks with the rest of the stocks 
+
+  return [...sortedTopStocks, ...otherStocks];
+};
+
 export default function HomeScreen() {
   const { data: recentStocksData, isPending: isLoadindRecentStocks } = useQuery({
     queryKey: ["recentStocks"],
     queryFn: () => fetchMarketTickers(1, "STOCKS"),
+    select: (data) => {
+      if (!data || !data.body) return data;
+      return {
+        ...data,
+        body: sortStocks(data.body)
+      }
+    }
   })
 
   return (
@@ -89,7 +117,8 @@ export default function HomeScreen() {
                 style={{ fontFamily: "RubikBold" }}
 
 
-              >Stocks</Text>
+              >Stocks {recentStocksData?.body?.length}
+              </Text>
               {
                 isLoadindRecentStocks ? (
                   <View className="h-24 justify-center items-center">
@@ -108,16 +137,38 @@ export default function HomeScreen() {
                       <View className="flex-row flex-wrap">{chunk.map((stock: any) => {
                         const isPositive = !stock.netchange.startsWith("-");
                         return (
-                          <View key={stock.symbol}>
+                          <View key={stock.symbol}
+                            style={{
+                              width: (width - 32) / 4,
+                            }}
+                            className="mb-2"
+                          >
                             <TouchableOpacity
                               onPress={() => router.push(`/stock/${stock.symbol}`)}
                             >
                               <View className="flex-row items-center">
 
-                                <View className="w-10 h-10 rounded-full bg-white20 items-center justify-center mr-2">
-                                  <Text className="text-white text-lg">
+                                <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-2">
+                                  <Text className="text-white text-lg"
+                                    style={{ fontFamily: "RubikBold" }}
+                                  >
                                     {stock.symbol.charAt(0)}
                                   </Text>
+                                </View>
+                                <View >
+                                  <Text className="text-white text-lg"
+                                    style={{ fontFamily: "RubikBold" }}
+                                  >
+                                    {stock.symbol}
+                                  </Text>
+                                  <Text
+                                    style={{ fontFamily: "RubikSemiBold" }}
+                                    className={`text-sm ${isPositive ? "text-green-600" : "text-red-600"}`}
+                                  >
+                                    {stock.pctchange}
+
+                                  </Text>
+
                                 </View>
 
                               </View>
@@ -139,6 +190,80 @@ export default function HomeScreen() {
             </View>
 
           </ScrollView>
+
+          {/* Quick AI Action */}
+
+          <View className="my-8">
+            <Text
+              className="text-white text-lg mb-4"
+              style={{ fontFamily: "RubikBold" }}
+            >
+              Quick AI Action
+
+            </Text>
+            <View className="flex-row">
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/ai-chat")}
+                className="flex-1 bg-white/10 rounded-lg mr-4 p-4"
+              >
+                <Ionicons
+                  name="analytics"
+                  size={24}
+                  color="#60a5fa"
+                  className="mb-2"
+                />
+                <Text className="text-white text-sm"
+                  style={{ fontFamily: "RubikSemiBold" }}
+                >
+                  Ask AI About These Stocks
+
+                </Text>
+                <Text
+                  className="text-white text-sm"
+                  style={{ fontFamily: "RubikRegular" }}
+
+                >
+                  Get Insights on current market leaders
+
+                </Text>
+
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/watchlist")}
+                className="flex-1 bg-white/10 rounded-lg ml-2 p-4"
+              >
+                <Ionicons
+                  name="star"
+                  size={24}
+                  color="#fbbf24"
+                  className="mb-2"
+                />
+                <Text className="text-white text-sm"
+                  style={{ fontFamily: "RubikSemiBold" }}
+                >
+                  Analyze Watchlist
+
+                </Text>
+                <Text
+                  className="text-white text-sm"
+                  style={{ fontFamily: "RubikRegular" }}
+
+                >
+                  AI Portfolio Analysis
+
+                </Text>
+
+              </TouchableOpacity>
+
+            </View>
+
+          </View>
+
+          {/* Market Type Segments */}
+          
+
+
+
         </View>
 
       </LinearGradient>

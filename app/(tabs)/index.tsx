@@ -3,10 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { useState } from 'react';
 import { ActivityIndicator, Dimensions, Pressable, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import Carousel from "react-native-reanimated-carousel";
 import { blurhash } from "../../app/index";
 import { fetchMarketTickers } from '../api/marketApi';
+
 
 
 const { width } = Dimensions.get("window");
@@ -21,25 +23,43 @@ const chunkArray = (array: any[], size: number) => {
 
 const topStocks = ["APPL", "GOOG", "MSFT", "AMZN", "TSLA"];
 
+const marketTypes = ["STOCKS", "ETF", "MUTUALFUNDS", "FUTURES"];
+
 const sortStocks = (stocks: any[]) => {
   if (!stocks || !stocks.length) return [];
 
   //First find all the top stocks
-
   const topStocksItems: any[] = stocks.filter((stock) => topStocks.includes(stock.symbol.toUpperCase()));
 
   // sort the tops stocks according to priority
-
   const sortedTopStocks = topStocks.map((symbol: any) => topStocksItems.find((stock) => stock.symbol.toUpperCase() === symbol)).filter(Boolean);
 
   const otherStocks = stocks.filter((stock) => !topStocks.includes(stock.symbol.toUpperCase()));
 
   // Combine sorted tops stocks with the rest of the stocks 
-
   return [...sortedTopStocks, ...otherStocks];
 };
 
+const transformETFData = (data: any) => {
+  return {
+    ...data,
+    body: data.body.map((item: any) => ({
+      symbol: item.symbol,
+      name: item.name,
+      pctchange: item.pctchange,
+      netchange: item.netchange,
+      marketCap: item.marketCap,
+      lastSale: item.lastSalePrice,
+    }))
+  }
+}
+
+type MarketType = "STOCKS" | "ETF" | "MUTUALFUNDS" | "FUTURES";
+
 export default function HomeScreen() {
+
+  const [selectedMarket, setSelectedMarket] = useState<MarketType>("STOCKS");
+
   const { data: recentStocksData, isPending: isLoadindRecentStocks } = useQuery({
     queryKey: ["recentStocks"],
     queryFn: () => fetchMarketTickers(1, "STOCKS"),
@@ -50,7 +70,20 @@ export default function HomeScreen() {
         body: sortStocks(data.body)
       }
     }
-  })
+  });
+
+  const { data: marketData, isPending: isLoadindMarket } = useQuery(
+    {
+      queryKey: ["marketTickers", selectedMarket],
+      queryFn: () => fetchMarketTickers(1, selectedMarket),
+      select: (data) => {
+        if (selectedMarket === "ETF") {
+          return transformETFData(data)
+        }
+        return data
+      },
+    },
+  );
 
   return (
     <View className="flex-1" >
@@ -76,7 +109,6 @@ export default function HomeScreen() {
               >
                 Priya Jha
               </Text>
-
             </View>
             <View className="w-1/2 items-end">
               <Pressable
@@ -95,28 +127,22 @@ export default function HomeScreen() {
                   placeholder={{ blurhash }}
                   contentFit="contain"
                   transition={1000}
-
                 />
-
               </Pressable>
             </View>
-
           </View>
+
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               paddingBottom: 200,
             }}
-
           >
             {/*Stocks Section */}
             <View className="mt-4 p-4 rounded-2xl bg-blue-900/10 border border-white overflow-hidden">
-
               <Text
                 className="text-white text-lg mb-2"
                 style={{ fontFamily: "RubikBold" }}
-
-
               >Stocks {recentStocksData?.body?.length}
               </Text>
               {
@@ -147,7 +173,6 @@ export default function HomeScreen() {
                               onPress={() => router.push(`/stock/${stock.symbol}`)}
                             >
                               <View className="flex-row items-center">
-
                                 <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-2">
                                   <Text className="text-white text-lg"
                                     style={{ fontFamily: "RubikBold" }}
@@ -166,112 +191,182 @@ export default function HomeScreen() {
                                     className={`text-sm ${isPositive ? "text-green-600" : "text-red-600"}`}
                                   >
                                     {stock.pctchange}
-
                                   </Text>
-
                                 </View>
-
                               </View>
-
                             </TouchableOpacity>
-
                           </View>
                         )
                       })}</View>
                     )}
-
-
-
-
                   />
                 )}
-
-
             </View>
 
+            {/* Quick AI Action */}
+            <View className="my-8">
+              <Text
+                className="text-white text-lg mb-4"
+                style={{ fontFamily: "RubikBold" }}
+              >
+                Quick AI Action
+              </Text>
+              <View className="flex-row">
+                <TouchableOpacity
+                  onPress={() => router.push("/(tabs)/ai-chat")}
+                  className="flex-1 bg-white/10 rounded-lg mr-4 p-4"
+                >
+                  <Ionicons
+                    name="analytics"
+                    size={24}
+                    color="#60a5fa"
+                    className="mb-2"
+                  />
+                  <Text className="text-white text-sm"
+                    style={{ fontFamily: "RubikSemiBold" }}
+                  >
+                    Ask AI About These Stocks
+                  </Text>
+                  <Text
+                    className="text-white text-sm"
+                    style={{ fontFamily: "RubikRegular" }}
+                  >
+                    Get Insights on current market leaders
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push("/(tabs)/watchlist")}
+                  className="flex-1 bg-white/10 rounded-lg ml-2 p-4"
+                >
+                  <Ionicons
+                    name="star"
+                    size={24}
+                    color="#fbbf24"
+                    className="mb-2"
+                  />
+                  <Text className="text-white text-sm"
+                    style={{ fontFamily: "RubikSemiBold" }}
+                  >
+                    Analyze Watchlist
+                  </Text>
+                  <Text
+                    className="text-white text-sm"
+                    style={{ fontFamily: "RubikRegular" }}
+                  >
+                    AI Portfolio Analysis
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Market Type Segments */}
+            <View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="mb-4"
+              >
+                {
+                  marketTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      onPress={() => setSelectedMarket(type as MarketType)}
+                      className={`px-4 py-2 mr-2 rounded-full ${selectedMarket === type ? "bg-white" : "bg-white/10"} `}
+                    >
+                      <Text
+                        className={`${selectedMarket === type ? "text-black" : "text-white"}`}
+                        style={{
+                          fontFamily: `${selectedMarket === type ? "RubikBold" : "RubikSemiBold"}`
+                        }}
+                      >{type}</Text>
+                    </TouchableOpacity>
+                  ))
+                }
+              </ScrollView>
+            </View>
+
+            {/* Indices Section */}
+            <View>
+              <Text
+                className="text-white text-lg mb-2"
+                style={{ fontFamily: "RubikBold" }}
+              >Indices</Text>
+
+              {isLoadindMarket ? (
+                <View className="h-24 justify-center items-center">
+                  <ActivityIndicator
+                    size="small" color="white"
+                  />
+                </View>
+              ) : (
+                <Carousel
+                  loop={false}
+                  width={width - 32}
+                  height={100}
+                  data={chunkArray(marketData?.body || [], 2)}
+                  scrollAnimationDuration={1000}
+                  renderItem={({ item: chunk }) => (
+                    <View className="flex-row flex-wrap">{chunk.map((item: any) => {
+                      const isPositive = !item.netchange.startsWith("-");
+                      return (
+                        <TouchableOpacity
+                          key={item.symbol}
+                          onPress={() => router.push(`/stock/${item.symbol}`)}
+                          className="bg-white/10 rounded-lg p-4 mb-2 w-full"
+                        >
+                          <View className="flex-row items-center justify-between">
+                            <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-2">
+                              <Text
+                                className="text-white text-lg"
+                                style={{ fontFamily: "RubikBold" }}
+                              >
+                                {item.symbol.charAt(0)}
+                              </Text>
+                            </View>
+
+                            <View className="w-[90%] flex-row justify-between">
+                              <View className="w-[70%]">
+                                <Text
+                                  className="text-white text-lg"
+                                  style={{ fontFamily: "RubikBold" }}
+                                >
+                                  {item?.symbol}
+                                </Text>
+
+                                <Text
+                                  className="text-white text-sm"
+                                  style={{ fontFamily: "RubikMedium" }}
+                                >
+                                  {item?.name.length > 25 ? item?.name.slice(0, 25) + "..." : item?.name}
+                                </Text>
+                              </View>
+
+                              <View className="items-end">
+                                <Text
+                                  className="text-white text-sm"
+                                  style={{ fontFamily: "RubikMedium" }}
+                                >
+                                  {item?.lastsale}
+                                </Text>
+                                <Text
+                                  style={{ fontFamily: "RubikSemiBold" }}
+                                  className={`text-sm ${isPositive ? "text-green-600" : "text-red-600"}`}
+                                >
+                                  {item.pctchange}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      )
+                    })}</View>
+                  )}
+                />
+              )}
+            </View>
           </ScrollView>
-
-          {/* Quick AI Action */}
-
-          <View className="my-8">
-            <Text
-              className="text-white text-lg mb-4"
-              style={{ fontFamily: "RubikBold" }}
-            >
-              Quick AI Action
-
-            </Text>
-            <View className="flex-row">
-              <TouchableOpacity
-                onPress={() => router.push("/(tabs)/ai-chat")}
-                className="flex-1 bg-white/10 rounded-lg mr-4 p-4"
-              >
-                <Ionicons
-                  name="analytics"
-                  size={24}
-                  color="#60a5fa"
-                  className="mb-2"
-                />
-                <Text className="text-white text-sm"
-                  style={{ fontFamily: "RubikSemiBold" }}
-                >
-                  Ask AI About These Stocks
-
-                </Text>
-                <Text
-                  className="text-white text-sm"
-                  style={{ fontFamily: "RubikRegular" }}
-
-                >
-                  Get Insights on current market leaders
-
-                </Text>
-
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.push("/(tabs)/watchlist")}
-                className="flex-1 bg-white/10 rounded-lg ml-2 p-4"
-              >
-                <Ionicons
-                  name="star"
-                  size={24}
-                  color="#fbbf24"
-                  className="mb-2"
-                />
-                <Text className="text-white text-sm"
-                  style={{ fontFamily: "RubikSemiBold" }}
-                >
-                  Analyze Watchlist
-
-                </Text>
-                <Text
-                  className="text-white text-sm"
-                  style={{ fontFamily: "RubikRegular" }}
-
-                >
-                  AI Portfolio Analysis
-
-                </Text>
-
-              </TouchableOpacity>
-
-            </View>
-
-          </View>
-
-          {/* Market Type Segments */}
-          
-
-
-
         </View>
-
       </LinearGradient>
-
-
-
     </View>
   );
 }
-
-

@@ -9,8 +9,6 @@ import Carousel from "react-native-reanimated-carousel";
 import { blurhash } from "../../app/index";
 import { fetchMarketTickers } from '../api/marketApi';
 
-
-
 const { width } = Dimensions.get("window");
 const chunkArray = (array: any[], size: number) => {
   const chunks = [];
@@ -21,7 +19,7 @@ const chunkArray = (array: any[], size: number) => {
   return chunks;
 }
 
-const topStocks = ["APPL", "GOOG", "MSFT", "AMZN", "TSLA"];
+const topStocks = ["AAPL", "GOOG", "MSFT", "AMZN", "TSLA"];
 
 const marketTypes = ["STOCKS", "ETF", "MUTUALFUNDS", "FUTURES"];
 
@@ -45,11 +43,11 @@ const transformETFData = (data: any) => {
     ...data,
     body: data.body.map((item: any) => ({
       symbol: item.symbol,
-      name: item.name,
-      pctchange: item.pctchange,
-      netchange: item.netchange,
+      name: item.companyName,
+      pctchange: item.percentChange,
+      netchange: item.netChange,
       marketCap: item.marketCap,
-      lastSale: item.lastSalePrice,
+      lastsale: item.lastSalePrice,
     }))
   }
 }
@@ -97,10 +95,10 @@ export default function HomeScreen() {
       >
         <View className="h-full p-4 pt-16">
           {/* Header */}
-          <View className="flex-row justofy-between items-center">
+          <View className="flex-row justify-between items-center">
             <View className="w-1/2">
               <Text className="text-white text-lg"
-                style={{ fontFamily: "Rubikmedium" }}
+                style={{ fontFamily: "RubikMedium" }}
               >
                 Good {new Date().getHours() < 12 ? "Morning" : "Afternoon"}
               </Text>
@@ -139,7 +137,7 @@ export default function HomeScreen() {
             }}
           >
             {/*Stocks Section */}
-            <View className="mt-4 p-4 rounded-2xl bg-blue-900/10 border border-white overflow-hidden">
+            <View className="mt-4 p-4 rounded-2xl bg-blue-900/10 border border-white/20 overflow-hidden">
               <Text
                 className="text-white text-lg mb-2"
                 style={{ fontFamily: "RubikBold" }}
@@ -155,7 +153,7 @@ export default function HomeScreen() {
                 ) : (
                   <Carousel
                     loop={false}
-                    width={width - 32}
+                    width={width - 64}
                     height={100}
                     data={chunkArray(recentStocksData?.body || [], 6)}
                     scrollAnimationDuration={1000}
@@ -165,7 +163,7 @@ export default function HomeScreen() {
                         return (
                           <View key={stock.symbol}
                             style={{
-                              width: (width - 32) / 4,
+                              width: (width - 64) / 4,
                             }}
                             className="mb-2"
                           >
@@ -174,21 +172,21 @@ export default function HomeScreen() {
                             >
                               <View className="flex-row items-center">
                                 <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-2">
-                                  <Text className="text-white text-lg"
+                                  <Text className="text-white text-base"
                                     style={{ fontFamily: "RubikBold" }}
                                   >
                                     {stock.symbol.charAt(0)}
                                   </Text>
                                 </View>
-                                <View >
-                                  <Text className="text-white text-lg"
+                                <View>
+                                  <Text className="text-white text-sm"
                                     style={{ fontFamily: "RubikBold" }}
                                   >
                                     {stock.symbol}
                                   </Text>
                                   <Text
                                     style={{ fontFamily: "RubikSemiBold" }}
-                                    className={`text-sm ${isPositive ? "text-green-600" : "text-red-600"}`}
+                                    className={`text-xs ${isPositive ? "text-green-500" : "text-red-500"}`}
                                   >
                                     {stock.pctchange}
                                   </Text>
@@ -204,7 +202,7 @@ export default function HomeScreen() {
             </View>
 
             {/* Quick AI Action */}
-            <View className="my-8">
+            <View className="my-6">
               <Text
                 className="text-white text-lg mb-4"
                 style={{ fontFamily: "RubikBold" }}
@@ -214,7 +212,7 @@ export default function HomeScreen() {
               <View className="flex-row">
                 <TouchableOpacity
                   onPress={() => router.push("/(tabs)/ai-chat")}
-                  className="flex-1 bg-white/10 rounded-lg mr-4 p-4"
+                  className="flex-1 bg-white/10 rounded-lg mr-2 p-4"
                 >
                   <Ionicons
                     name="analytics"
@@ -228,10 +226,10 @@ export default function HomeScreen() {
                     Ask AI About These Stocks
                   </Text>
                   <Text
-                    className="text-white text-sm"
+                    className="text-white/70 text-xs mt-1"
                     style={{ fontFamily: "RubikRegular" }}
                   >
-                    Get Insights on current market leaders
+                    Get insights on current market leaders
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -250,7 +248,7 @@ export default function HomeScreen() {
                     Analyze Watchlist
                   </Text>
                   <Text
-                    className="text-white text-sm"
+                    className="text-white/70 text-xs mt-1"
                     style={{ fontFamily: "RubikRegular" }}
                   >
                     AI Portfolio Analysis
@@ -260,7 +258,7 @@ export default function HomeScreen() {
             </View>
 
             {/* Market Type Segments */}
-            <View>
+            <View className="mb-4">
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -271,12 +269,12 @@ export default function HomeScreen() {
                     <TouchableOpacity
                       key={type}
                       onPress={() => setSelectedMarket(type as MarketType)}
-                      className={`px-4 py-2 mr-2 rounded-full ${selectedMarket === type ? "bg-white" : "bg-white/10"} `}
+                      className={`px-4 py-2 mr-2 rounded-full ${selectedMarket === type ? "bg-white" : "bg-white/10"}`}
                     >
                       <Text
                         className={`${selectedMarket === type ? "text-black" : "text-white"}`}
                         style={{
-                          fontFamily: `${selectedMarket === type ? "RubikBold" : "RubikSemiBold"}`
+                          fontFamily: selectedMarket === type ? "RubikBold" : "RubikSemiBold"
                         }}
                       >{type}</Text>
                     </TouchableOpacity>
@@ -286,80 +284,89 @@ export default function HomeScreen() {
             </View>
 
             {/* Indices Section */}
-            <View>
+            <View className="mb-4">
               <Text
-                className="text-white text-lg mb-2"
+                className="text-white text-lg mb-3"
                 style={{ fontFamily: "RubikBold" }}
               >Indices</Text>
 
               {isLoadindMarket ? (
-                <View className="h-24 justify-center items-center">
-                  <ActivityIndicator
-                    size="small" color="white"
-                  />
+                <View className="h-32 justify-center items-center bg-white/10 rounded-lg">
+                  <ActivityIndicator size="small" color="white" />
                 </View>
               ) : (
                 <Carousel
                   loop={false}
                   width={width - 32}
-                  height={100}
+                  height={160}
                   data={chunkArray(marketData?.body || [], 2)}
                   scrollAnimationDuration={1000}
                   renderItem={({ item: chunk }) => (
-                    <View className="flex-row flex-wrap">{chunk.map((item: any) => {
-                      const isPositive = !item.netchange.startsWith("-");
-                      return (
-                        <TouchableOpacity
-                          key={item.symbol}
-                          onPress={() => router.push(`/stock/${item.symbol}`)}
-                          className="bg-white/10 rounded-lg p-4 mb-2 w-full"
-                        >
-                          <View className="flex-row items-center justify-between">
-                            <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-2">
-                              <Text
-                                className="text-white text-lg"
-                                style={{ fontFamily: "RubikBold" }}
-                              >
-                                {item.symbol.charAt(0)}
-                              </Text>
-                            </View>
-
-                            <View className="w-[90%] flex-row justify-between">
-                              <View className="w-[70%]">
+                    <View className="gap-2 w-[98%]">
+                      {chunk.map((item: any) => {
+                        const isPositive = !item.netchange.startsWith("-");
+                        return (
+                          <TouchableOpacity
+                            key={item.symbol}
+                            onPress={() => router.push(`/stock/${item.symbol}`)}
+                            className="bg-white/10 rounded-lg p-4"
+                          >
+                            <View className="flex-row items-center">
+                              <View className="w-12 h-12 rounded-full bg-white/20 items-center justify-center mr-3">
                                 <Text
                                   className="text-white text-lg"
                                   style={{ fontFamily: "RubikBold" }}
                                 >
-                                  {item?.symbol}
-                                </Text>
-
-                                <Text
-                                  className="text-white text-sm"
-                                  style={{ fontFamily: "RubikMedium" }}
-                                >
-                                  {item?.name.length > 25 ? item?.name.slice(0, 25) + "..." : item?.name}
+                                  {item.symbol.charAt(0)}
                                 </Text>
                               </View>
 
-                              <View className="items-end">
-                                <Text
-                                  className="text-white text-sm"
-                                  style={{ fontFamily: "RubikMedium" }}
-                                >
-                                  {item?.lastsale}
-                                </Text>
-                                <Text
+                              <View className="flex-1 flex-row justify-between items-center">
+                                <View className="flex-1 mr-2">
+                                  <Text
+                                    className="text-white text-base"
+                                    style={{ fontFamily: "RubikBold" }}
+                                    numberOfLines={1}
+                                  >
+                                    {item?.symbol}
+                                  </Text>
+                                  <Text
+                                    className="text-white/70 text-xs mt-1"
+                                    style={{ fontFamily: "RubikMedium" }}
+                                    numberOfLines={1}
+                                  >
+                                    {item?.name}
+                                  </Text>
+                                </View>
+
+                                <View className="items-end">
+                                  <Text
+                                    className="text-white text-base"
+                                    style={{ fontFamily: "RubikBold" }}
+                                  >
+                                    ${item?.lastsale}
+                                  </Text>
+
+                                  {/* <Text
+                                  className="text-white text-lg"
                                   style={{ fontFamily: "RubikSemiBold" }}
-                                  className={`text-sm ${isPositive ? "text-green-600" : "text-red-600"}`}
-                                >
-                                  {item.pctchange}
-                                </Text>
+                                  >
+                                    {item.lastpctchange}
+
+                                  </Text> */}
+                                  <Text
+                                    style={{ fontFamily: "RubikSemiBold" }}
+                                    className={`text-sm ${isPositive ? "text-green-500" : "text-red-500"}`}
+                                  >
+                                    {item.pctchange}
+                                  </Text>
+                                </View>
                               </View>
                             </View>
-                          </View>
-                        </TouchableOpacity>
-                      )
-                    })}</View>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
                   )}
                 />
               )}

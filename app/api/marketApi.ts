@@ -159,6 +159,33 @@ export interface QuotesResponse {
     body: StockQuote[];
 }
 
+export async function fetchStockHistory(
+   symbol: string,
+   interval: "1m" | "5m" | "15m" | "1d" | "1w" | "1mo" = "1d" ,
+   diffandsplits: "true" | "false" = "true" 
+
+): Promise<StockHistoryData> {
+    const options = {
+        method: "GET",
+        url: `${BASE_URL}/api/v1/markets/stock/history`,
+        params: {
+            symbol,
+            interval,
+            diffandsplits,
+            
+        },
+        headers: baseHeaders,
+    };
+
+    try {
+        const response = await axios.request(options);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching market tickers:", error);
+        throw error;
+    }
+}
+
 // Insider Trades
 export interface InsiderTrade {
     symbol: string;
@@ -251,33 +278,55 @@ export async function fetchMarketTickers(
     }
 }
 
-/**
- * Fetch historical OHLCV data for charts
- */
-export async function fetchStockHistory(
-    symbol: string,
-    interval: string = "1d",
-    range: string = "1mo"
-): Promise<StockHistoryData> {
+export async function fetchStockQuotes(
+   symbols: string[]
+): Promise<QuotesResponse> {
     const options = {
         method: "GET",
-        url: `${BASE_URL}/api/v2/markets/history`,
+        url: `${BASE_URL}/api/v1/markets/stock/quotes`,
         params: {
-            symbol,
-            interval,
-            range,
+            ticker: symbols.join(","),
+            
         },
         headers: baseHeaders,
     };
 
     try {
-        const response = await axios.request<StockHistoryData>(options);
+        const response = await axios.request(options);
         return response.data;
     } catch (error) {
-        console.error("Error fetching stock history:", error);
+        console.error("Error fetching market tickers:", error);
         throw error;
     }
 }
+
+/**
+ * Fetch historical OHLCV data for charts
+ */
+// export async function fetchStockHistory(
+//     symbol: string,
+//     interval: string = "1d",
+//     range: string = "1mo"
+// ): Promise<StockHistoryData> {
+//     const options = {
+//         method: "GET",
+//         url: `${BASE_URL}/api/v2/markets/history`,
+//         params: {
+//             symbol,
+//             interval,
+//             range,
+//         },
+//         headers: baseHeaders,
+//     };
+
+//     try {
+//         const response = await axios.request<StockHistoryData>(options);
+//         return response.data;
+//     } catch (error) {
+//         console.error("Error fetching stock history:", error);
+//         throw error;
+//     }
+// }
 
 /**
  * Fetch detailed quote for a single stock

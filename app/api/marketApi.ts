@@ -300,6 +300,31 @@ export async function fetchStockQuotes(
     }
 }
 
+
+export async function fetchStockModule(
+   ticker: string,
+   module: "asset-profile" | "summary-detail"| "default-key-statistics"
+): Promise<StockModuleData> {
+    const options = {
+        method: "GET",
+        url: `${BASE_URL}/api/v1/markets/stock/modules`,
+        params: {
+            ticker,
+            module,
+
+            
+        },
+        headers: baseHeaders,
+    };
+
+    try {
+        const response = await axios.request(options);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching market tickers:", error);
+        throw error;
+    }
+}
 /**
  * Fetch historical OHLCV data for charts
  */
@@ -331,46 +356,50 @@ export async function fetchStockQuotes(
 /**
  * Fetch detailed quote for a single stock
  */
-export async function fetchStockQuote(symbol: string): Promise<QuotesResponse> {
-    const options = {
-        method: "GET",
-        url: `${BASE_URL}/api/v2/quote`,
-        params: {
-            symbol,
-        },
-        headers: baseHeaders,
-    };
+// export async function fetchStockQuote(symbol: string): Promise<QuotesResponse> {
+//     const options = {
+//         method: "GET",
+//         url: `${BASE_URL}/api/v2/quote`,
+//         params: {
+//             symbol,
+//         },
+//         headers: baseHeaders,
+//     };
 
-    try {
-        const response = await axios.request<QuotesResponse>(options);
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching stock quote:", error);
-        throw error;
-    }
-}
+//     try {
+//         const response = await axios.request<QuotesResponse>(options);
+//         return response.data;
+//     } catch (error) {
+//         console.error("Error fetching stock quote:", error);
+//         throw error;
+//     }
+// }
+
+
 
 /**
  * Fetch company profile/module data
  */
-export async function fetchStockModule(symbol: string): Promise<StockModuleData> {
-    const options = {
-        method: "GET",
-        url: `${BASE_URL}/api/v2/stock/profile`,
-        params: {
-            symbol,
-        },
-        headers: baseHeaders,
-    };
+// export async function fetchStockModule(symbol: string): Promise<StockModuleData> {
+//     const options = {
+//         method: "GET",
+//         url: `${BASE_URL}/api/v2/stock/profile`,
+//         params: {
+//             symbol,
+//         },
+//         headers: baseHeaders,
+//     };
 
-    try {
-        const response = await axios.request<StockModuleData>(options);
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching stock module:", error);
-        throw error;
-    }
-}
+//     try {
+//         const response = await axios.request<StockModuleData>(options);
+//         return response.data;
+//     } catch (error) {
+//         console.error("Error fetching stock module:", error);
+//         throw error;
+//     }
+// }
+
+
 
 /**
  * Fetch insider trading data

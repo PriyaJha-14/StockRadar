@@ -2,27 +2,31 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { Pressable, StatusBar, Text, View } from "react-native";
-import { fetchStockQuotes, fetchStockHistory } from "../api/marketApi";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StatusBar, Text, View } from "react-native";
+import { fetchStockHistory, fetchStockModule, fetchStockQuotes } from "../api/marketApi";
 
 
-const timeFrames =[
-    {label: "1D", interval: "5m", days: 1},
-    {label: "1W", interval: "15m", days: 7},
-    {label: "1M", interval: "1d", days: 30},
-    {label: "3M", interval: "1d", days: 90},
-    {label: "6M", interval: "1d", days: 180},
-    {lable: "1Y", interval: "1d", days: 365},
-    {label: "5Y", interval: "1d", days: 1825},
-    {label: "Max", interval: "1d", days: 3650}, //done till here  
+const timeFrames = [
+    { label: "1D", interval: "5m", days: 1 },
+    { label: "1W", interval: "15m", days: 7 },
+    { label: "1M", interval: "1d", days: 30 },
+    { label: "3M", interval: "1d", days: 90 },
+    { lable: "1Y", interval: "1wk", days: 365 },
+    { label: "All", interval: "1mo", days: 0 },
 ]
 
-
+const TABS = ["Overview", "Financials"]
 
 const StockDetailsScreen = () => {
 
     const { symbol } = useLocalSearchParams<{ symbol: string }>();
+
+    const [activeTab, setActiveTab] = useState(0);
+
+    const [showFullSummary, setShowFullSummary] = useState(false);
+
+    const [selectedTimeFrame, setSelectedTimeFrame] = useState(0);
 
     const isWatched = false;
 
@@ -35,7 +39,7 @@ const StockDetailsScreen = () => {
 
     // History Data
 
-    const{ data: historyData, isPending: isHistoryPending } = useQuery({
+    const { data: historyData, isPending: isHistoryLoading } = useQuery({
         queryKey: ["stockHistory", symbol, timeFrames[selectedTimeFrame].interval],
         queryFn: () => fetchStockHistory(
             symbol as string,
@@ -44,32 +48,112 @@ const StockDetailsScreen = () => {
         enabled: !!symbol,
     })
 
-    const processedChangeData = useMemo(() => {
+    // Profile Data  
+
+    const { data: profileData, isPending: isProfileLoading } = useQuery({
+        queryKey: ["stockModule", symbol, "all"],
+        queryFn: () => fetchStockModule(
+            symbol as string,
+            "asset-profile"
+        ),
+        enabled: !!symbol,
+    });
+
+
+
+    const processedChartData = useMemo(() => {
         if (!historyData?.body) return [];
 
-        return Object.entries(history.body).map(([timestamp, data]) => ({
+        return Object.entries(historyData.body).map(([timestamp, data]) => ({
             timestamp: parseInt(timestamp),
             date: new Date(parseInt(timestamp) * 1000),
             open: data.open,
             high: data.high,
             low: data.low,
             close: data.close,
+            value: data.close,
             volume: data.volume,
         }));
     }, [historyData])
 
     const priceChangeData = useMemo(() => {
-        if (processedChangeData.length === 0)
+        if (processedChartData.length === 0)
             return { change: 0, percentChange: 0, isPositive: false }
 
-        const firstPrice = processedChangeData[0]?.value || 0;
-        const lastPrice = processedChangeData[processedChangeData.length - 1]?.value || 0;
+        const firstPrice = processedChartData[0]?.value || 0;
+        const lastPrice = processedChartData[processedChartData.length - 1]?.value || 0;
 
         const change = lastPrice - firstPrice;
         const percentChange = ((change / firstPrice) * 100)
 
         return { change, percentChange, isPositive: change > 0 }
-    }, [processedChangeData])
+    }, [processedChartData])
+
+    const renderTabBar = () => {
+        return (
+            <View className="flex-row bg-white border-b border-gray-200">
+                {TABS.map((tab, index) => (
+                    <Pressable key={tab}
+                        onPress={() => setActiveTab(index)}
+                        className={`flex-1 py-3 items-center border-b-2 *: ${activeTab === index ? "border-b-2 border-blue-600" : "border-b-2 border-transparent"}`}
+                    >
+                        <Text
+                            className={`${activeTab === index ? "text-blue-600" : "text-gray-600"}`}
+                            style={{ fontFamily: "RubikMedium" }}
+                        >
+                            {tab}
+                        </Text>
+                    </Pressable>
+                ))}
+
+            </View>
+        )
+    };
+
+    const renderOverview = () => {
+        if (isProfileLoading) {
+            return (
+                <View>
+                    <ActivityIndicator size="large" color="white" />
+                </View>
+            )
+        }
+
+        const profile = profileData?.body;
+        return (
+            <View className="p-4">
+
+                {/* Company Description */}
+
+                {profile?.longBusinessSummary && (
+                    <View className="mb-4">
+                        <Text className="text-lg font-bold text-white">About</Text>
+
+                        <Text className="text-white"
+                            style={{ fontFamily: "RubikMedium" }}
+                        >
+                            {
+                                showFullSummary || profile.longBusinessSummary.length <= 250 ? profile.longBusinessSummary : `${profile.longBusinessSummary.substring(0, 250)}...`
+                            }
+
+                        </Text>
+                        {profile.longBusinessSummary.length > 250 && (
+                            <Pressable onPress={() => setShowFullSummary(!showFullSummary)}
+                            className="mt-1"
+                            >
+                                <Text className="text-blue-400 text-sm">
+                                    {showFullSummary ? "Show Less" : "Show More"}
+                                </Text>
+
+                            </Pressable>
+                        )}
+
+                    </View>
+                )}
+
+            </View>
+        );
+    };
     return (
         <View className="flex-1">
             <StatusBar barStyle="light-content" />
@@ -122,6 +206,10 @@ const StockDetailsScreen = () => {
 
                         <View>
                             <View>
+                                <Text className="text-2xl font-bold text-white">
+                                    ${processedChartData.length > 0 ? processedChartData[processedChartData.length - 1].value.toFixed(2) : "--"}
+
+                                </Text>
                                 <View className="flex-row items-center mt-1">
                                     <Text className={`text-lg ${priceChangeData.isPositive ? "text-green-600" : "text-red-600"
                                         }`}
@@ -130,10 +218,11 @@ const StockDetailsScreen = () => {
                                     >
                                         {priceChangeData.isPositive ? "+" : "-"}
                                         {priceChangeData.change.toFixed(2)}
-                                        {
-                                            { priceChangeData.isPositive ? "+" : "-" }
-                                            {priceChangeData.percentChange.toFixed(2)}%
-                                        }
+                                        (
+                                        {priceChangeData.isPositive ? "+" : "-"}
+                                        {priceChangeData.percentChange.toFixed(2)}%
+                                        )
+
                                     </Text>
                                 </View>
 
@@ -142,8 +231,25 @@ const StockDetailsScreen = () => {
                         </View>
 
                     </View>
+                    {/* Stock Body */}
+
+                    <ScrollView
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{
+                            paddingBottom: 400,
+                        }}
+                    >
+                        {renderTabBar()}
+
+                        {activeTab === 0 && renderOverview()}
+                        {activeTab === 1 && renderFinancialsTab()}
+
+
+                    </ScrollView>
 
                 </View>
+
+
 
 
             </LinearGradient>

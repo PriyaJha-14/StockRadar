@@ -13,7 +13,7 @@ const getApiKey = () => {
 
 const getApiHost = () => {
     if (__DEV__ && process.env.EXPO_PUBLIC_FINANCE_API_HOST) {
-        return process.env.EXPO_PUBLIC_FINANCE_API_HOST;  // Fixed typo: was HIST
+        return process.env.EXPO_PUBLIC_FINANCE_API_HOST;
     }
     return Constants.expoConfig?.extra?.FINANCE_API_HOST;
 };
@@ -43,7 +43,7 @@ export interface MarketTickersResponse {
     meta: {
         version: string;
         status: number;
-        copyright: string;  // Fixed typo: was coypwrite
+        copyright: string;
         totalrecords: number;
         headers: {
             symbol: string;
@@ -64,7 +64,7 @@ export interface StockHistoryPoint {
     close: number;
     volume: number;
     date: string;
-    date_utc: number;  // Fixed: was Number
+    date_utc: number;
 }
 
 export interface StockHistoryData {
@@ -75,7 +75,7 @@ export interface StockHistoryData {
         chartPreviousClose: number;
         currency: string;
         dataGranularity: string;
-        exchangeName: string;  // Fixed typo: was exchnageName
+        exchangeName: string;
         exchangeTimezoneName: string;
         fiftyTwoWeekHigh: number;
         fiftyTwoWeekLow: number;
@@ -110,6 +110,7 @@ export interface StockModuleData {
         status: number;
     };
     body: {
+        companyOfficers: any;
         address1: string;
         city: string;
         state: string;
@@ -157,33 +158,6 @@ export interface QuotesResponse {
         status: number;
     };
     body: StockQuote[];
-}
-
-export async function fetchStockHistory(
-   symbol: string,
-   interval: "1m" | "5m" | "15m" | "1d" | "1w" | "1mo" = "1d" ,
-   diffandsplits: "true" | "false" = "true" 
-
-): Promise<StockHistoryData> {
-    const options = {
-        method: "GET",
-        url: `${BASE_URL}/api/v1/markets/stock/history`,
-        params: {
-            symbol,
-            interval,
-            diffandsplits,
-            
-        },
-        headers: baseHeaders,
-    };
-
-    try {
-        const response = await axios.request(options);
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching market tickers:", error);
-        throw error;
-    }
 }
 
 // Insider Trades
@@ -250,6 +224,18 @@ export interface SearchResponse {
     news: any[];
 }
 
+// ========= Helper Function for Error Handling =========
+
+const handleApiError = (error: any, context: string) => {
+    if (error.response?.status === 429) {
+        console.warn(`⚠️ Rate limit exceeded for ${context}. Please wait before trying again.`);
+        throw new Error("Rate limit exceeded. Please try again in a few minutes.");
+    }
+    
+    console.error(`Error in ${context}:`, error.message || error);
+    throw error;
+};
+
 // ========= API Functions =========
 
 /**
@@ -273,20 +259,22 @@ export async function fetchMarketTickers(
         const response = await axios.request<MarketTickersResponse>(options);
         return response.data;
     } catch (error) {
-        console.error("Error fetching market tickers:", error);
+        handleApiError(error, "fetchMarketTickers");
         throw error;
     }
 }
 
+/**
+ * Fetch stock quotes for multiple symbols
+ */
 export async function fetchStockQuotes(
-   symbols: string[]
+    symbols: string[]
 ): Promise<QuotesResponse> {
     const options = {
         method: "GET",
         url: `${BASE_URL}/api/v1/markets/stock/quotes`,
         params: {
             ticker: symbols.join(","),
-            
         },
         headers: baseHeaders,
     };
@@ -295,15 +283,17 @@ export async function fetchStockQuotes(
         const response = await axios.request(options);
         return response.data;
     } catch (error) {
-        console.error("Error fetching market tickers:", error);
+        handleApiError(error, "fetchStockQuotes");
         throw error;
     }
 }
 
-
+/**
+ * Fetch stock module data (company profile, statistics, etc.)
+ */
 export async function fetchStockModule(
-   ticker: string,
-   module: "asset-profile" | "summary-detail"| "default-key-statistics"
+    ticker: string,
+    module: "asset-profile" | "summary-detail" | "default-key-statistics"
 ): Promise<StockModuleData> {
     const options = {
         method: "GET",
@@ -311,8 +301,6 @@ export async function fetchStockModule(
         params: {
             ticker,
             module,
-
-            
         },
         headers: baseHeaders,
     };
@@ -321,85 +309,38 @@ export async function fetchStockModule(
         const response = await axios.request(options);
         return response.data;
     } catch (error) {
-        console.error("Error fetching market tickers:", error);
+        handleApiError(error, "fetchStockModule");
         throw error;
     }
 }
+
 /**
  * Fetch historical OHLCV data for charts
  */
-// export async function fetchStockHistory(
-//     symbol: string,
-//     interval: string = "1d",
-//     range: string = "1mo"
-// ): Promise<StockHistoryData> {
-//     const options = {
-//         method: "GET",
-//         url: `${BASE_URL}/api/v2/markets/history`,
-//         params: {
-//             symbol,
-//             interval,
-//             range,
-//         },
-//         headers: baseHeaders,
-//     };
+export async function fetchStockHistory(
+    symbol: string,
+    interval: "1m" | "5m" | "15m" | "1d" | "1w" | "1mo" = "1d",
+    diffandsplits: "true" | "false" = "true"
+): Promise<StockHistoryData> {
+    const options = {
+        method: "GET",
+        url: `${BASE_URL}/api/v1/markets/stock/history`,
+        params: {
+            symbol,
+            interval,
+            diffandsplits,
+        },
+        headers: baseHeaders,
+    };
 
-//     try {
-//         const response = await axios.request<StockHistoryData>(options);
-//         return response.data;
-//     } catch (error) {
-//         console.error("Error fetching stock history:", error);
-//         throw error;
-//     }
-// }
-
-/**
- * Fetch detailed quote for a single stock
- */
-// export async function fetchStockQuote(symbol: string): Promise<QuotesResponse> {
-//     const options = {
-//         method: "GET",
-//         url: `${BASE_URL}/api/v2/quote`,
-//         params: {
-//             symbol,
-//         },
-//         headers: baseHeaders,
-//     };
-
-//     try {
-//         const response = await axios.request<QuotesResponse>(options);
-//         return response.data;
-//     } catch (error) {
-//         console.error("Error fetching stock quote:", error);
-//         throw error;
-//     }
-// }
-
-
-
-/**
- * Fetch company profile/module data
- */
-// export async function fetchStockModule(symbol: string): Promise<StockModuleData> {
-//     const options = {
-//         method: "GET",
-//         url: `${BASE_URL}/api/v2/stock/profile`,
-//         params: {
-//             symbol,
-//         },
-//         headers: baseHeaders,
-//     };
-
-//     try {
-//         const response = await axios.request<StockModuleData>(options);
-//         return response.data;
-//     } catch (error) {
-//         console.error("Error fetching stock module:", error);
-//         throw error;
-//     }
-// }
-
-
+    try {
+        const response = await axios.request(options);
+        return response.data;
+    } catch (error) {
+        handleApiError(error, `fetchStockHistory for ${symbol}`);
+        throw error;
+    }
+}
 
 /**
  * Fetch insider trading data
@@ -418,7 +359,7 @@ export async function fetchInsiderTrades(symbol: string): Promise<InsiderTradesR
         const response = await axios.request<InsiderTradesResponse>(options);
         return response.data;
     } catch (error) {
-        console.error("Error fetching insider trades:", error);
+        handleApiError(error, `fetchInsiderTrades for ${symbol}`);
         throw error;
     }
 }
@@ -438,7 +379,7 @@ export async function fetchStockNews(symbol?: string): Promise<NewsResponse> {
         const response = await axios.request<NewsResponse>(options);
         return response.data;
     } catch (error) {
-        console.error("Error fetching stock news:", error);
+        handleApiError(error, "fetchStockNews");
         throw error;
     }
 }
@@ -460,7 +401,7 @@ export async function searchStocks(query: string): Promise<SearchResponse> {
         const response = await axios.request<SearchResponse>(options);
         return response.data;
     } catch (error) {
-        console.error("Error searching stocks:", error);
+        handleApiError(error, "searchStocks");
         throw error;
     }
 }

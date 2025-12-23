@@ -58,7 +58,8 @@ export default function HomeScreen() {
 
   const [selectedMarket, setSelectedMarket] = useState<MarketType>("STOCKS");
 
-  const { data: recentStocksData, isPending: isLoadindRecentStocks } = useQuery({
+  // Recent stocks query with rate limit protection
+  const { data: recentStocksData, isPending: isLoadindRecentStocks, error: recentStocksError } = useQuery({
     queryKey: ["recentStocks"],
     queryFn: () => fetchMarketTickers(1, "STOCKS"),
     select: (data) => {
@@ -67,21 +68,32 @@ export default function HomeScreen() {
         ...data,
         body: sortStocks(data.body)
       }
-    }
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: 1, // Only retry once
   });
 
-  const { data: marketData, isPending: isLoadindMarket } = useQuery(
-    {
-      queryKey: ["marketTickers", selectedMarket],
-      queryFn: () => fetchMarketTickers(1, selectedMarket),
-      select: (data) => {
-        if (selectedMarket === "ETF") {
-          return transformETFData(data)
-        }
-        return data
-      },
+  // Market data query with rate limit protection
+  const { data: marketData, isPending: isLoadindMarket, error: marketError } = useQuery({
+    queryKey: ["marketTickers", selectedMarket],
+    queryFn: () => fetchMarketTickers(1, selectedMarket),
+    select: (data) => {
+      if (selectedMarket === "ETF") {
+        return transformETFData(data)
+      }
+      return data
     },
-  );
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    gcTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
   return (
     <View className="flex-1" >
@@ -141,64 +153,75 @@ export default function HomeScreen() {
               <Text
                 className="text-white text-lg mb-2"
                 style={{ fontFamily: "RubikBold" }}
-              >Stocks {recentStocksData?.body?.length}
+              >Stocks {recentStocksData?.body?.length || 0}
               </Text>
-              {
-                isLoadindRecentStocks ? (
-                  <View className="h-24 justify-center items-center">
-                    <ActivityIndicator
-                      size="small" color="white"
-                    />
-                  </View>
-                ) : (
-                  <Carousel
-                    loop={false}
-                    width={width - 64}
-                    height={100}
-                    data={chunkArray(recentStocksData?.body || [], 6)}
-                    scrollAnimationDuration={1000}
-                    renderItem={({ item: chunk }) => (
-                      <View className="flex-row flex-wrap">{chunk.map((stock: any) => {
-                        const isPositive = !stock.netchange.startsWith("-");
-                        return (
-                          <View key={stock.symbol}
-                            style={{
-                              width: (width - 64) / 4,
-                            }}
-                            className="mb-2"
+
+              {/* Show rate limit error if present */}
+              {recentStocksError && (
+                <View className="bg-red-500/20 p-3 rounded-lg mb-3">
+                  <Text className="text-red-300 text-xs" style={{ fontFamily: "RubikMedium" }}>
+                    ⚠️ {(recentStocksError as Error).message || "Unable to load stocks"}
+                  </Text>
+                </View>
+              )}
+
+              {isLoadindRecentStocks ? (
+                <View className="h-24 justify-center items-center">
+                  <ActivityIndicator size="small" color="white" />
+                </View>
+              ) : recentStocksData?.body && recentStocksData.body.length > 0 ? (
+                <Carousel
+                  loop={false}
+                  width={width - 64}
+                  height={100}
+                  data={chunkArray(recentStocksData?.body || [], 6)}
+                  scrollAnimationDuration={1000}
+                  renderItem={({ item: chunk }) => (
+                    <View className="flex-row flex-wrap">{chunk.map((stock: any) => {
+                      const isPositive = !stock.netchange.startsWith("-");
+                      return (
+                        <View key={stock.symbol}
+                          style={{
+                            width: (width - 64) / 4,
+                          }}
+                          className="mb-2"
+                        >
+                          <TouchableOpacity
+                            onPress={() => router.push(`/stock/${stock.symbol}`)}
                           >
-                            <TouchableOpacity
-                              onPress={() => router.push(`/stock/${stock.symbol}`)}
-                            >
-                              <View className="flex-row items-center">
-                                <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-2">
-                                  <Text className="text-white text-base"
-                                    style={{ fontFamily: "RubikBold" }}
-                                  >
-                                    {stock.symbol.charAt(0)}
-                                  </Text>
-                                </View>
-                                <View>
-                                  <Text className="text-white text-sm"
-                                    style={{ fontFamily: "RubikBold" }}
-                                  >
-                                    {stock.symbol}
-                                  </Text>
-                                  <Text
-                                    style={{ fontFamily: "RubikSemiBold" }}
-                                    className={`text-xs ${isPositive ? "text-green-500" : "text-red-500"}`}
-                                  >
-                                    {stock.pctchange}
-                                  </Text>
-                                </View>
+                            <View className="flex-row items-center">
+                              <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-2">
+                                <Text className="text-white text-base"
+                                  style={{ fontFamily: "RubikBold" }}
+                                >
+                                  {stock.symbol.charAt(0)}
+                                </Text>
                               </View>
-                            </TouchableOpacity>
-                          </View>
-                        )
-                      })}</View>
-                    )}
-                  />
-                )}
+                              <View>
+                                <Text className="text-white text-sm"
+                                  style={{ fontFamily: "RubikBold" }}
+                                >
+                                  {stock.symbol}
+                                </Text>
+                                <Text
+                                  style={{ fontFamily: "RubikSemiBold" }}
+                                  className={`text-xs ${isPositive ? "text-green-500" : "text-red-500"}`}
+                                >
+                                  {stock.pctchange}
+                                </Text>
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        </View>
+                      )
+                    })}</View>
+                  )}
+                />
+              ) : (
+                <Text className="text-white/60 text-center py-4 text-sm" style={{ fontFamily: "RubikMedium" }}>
+                  No stocks available
+                </Text>
+              )}
             </View>
 
             {/* Quick AI Action */}
@@ -290,11 +313,20 @@ export default function HomeScreen() {
                 style={{ fontFamily: "RubikBold" }}
               >Indices</Text>
 
+              {/* Show rate limit error if present */}
+              {marketError && (
+                <View className="bg-red-500/20 p-3 rounded-lg mb-3">
+                  <Text className="text-red-300 text-xs" style={{ fontFamily: "RubikMedium" }}>
+                    ⚠️ {(marketError as Error).message || "Unable to load indices"}
+                  </Text>
+                </View>
+              )}
+
               {isLoadindMarket ? (
                 <View className="h-32 justify-center items-center bg-white/10 rounded-lg">
                   <ActivityIndicator size="small" color="white" />
                 </View>
-              ) : (
+              ) : marketData?.body && marketData.body.length > 0 ? (
                 <Carousel
                   loop={false}
                   width={width - 32}
@@ -346,14 +378,6 @@ export default function HomeScreen() {
                                   >
                                     ${item?.lastsale}
                                   </Text>
-
-                                  {/* <Text
-                                  className="text-white text-lg"
-                                  style={{ fontFamily: "RubikSemiBold" }}
-                                  >
-                                    {item.lastpctchange}
-
-                                  </Text> */}
                                   <Text
                                     style={{ fontFamily: "RubikSemiBold" }}
                                     className={`text-sm ${isPositive ? "text-green-500" : "text-red-500"}`}
@@ -369,6 +393,10 @@ export default function HomeScreen() {
                     </View>
                   )}
                 />
+              ) : (
+                <Text className="text-white/60 text-center py-4 text-sm" style={{ fontFamily: "RubikMedium" }}>
+                  No data available
+                </Text>
               )}
             </View>
           </ScrollView>

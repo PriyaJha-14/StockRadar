@@ -1,10 +1,15 @@
+import { formatStockForAi } from "@/utils/aiService";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StatusBar, Text, View } from "react-native";
+import { blurhash } from "../../app/index";
 import { fetchStockHistory, fetchStockModule, fetchStockQuotes } from "../api/marketApi";
+import { useChatStore } from "../store/chatStore";
+import { useWatchlistStore } from "../store/watchlistStore";
 
 const timeFrames = [
     { label: "1D", interval: "5m", days: 1 },
@@ -24,7 +29,12 @@ const StockDetailsScreen = () => {
     const [showFullSummary, setShowFullSummary] = useState(false);
     const [selectedTimeFrame, setSelectedTimeFrame] = useState(0);
 
-    const isWatched = false;
+    
+
+    const { setContext } = useChatStore();  // FIXED: SetContext → setContext (lowercase)
+
+    const { addStock, removeStock, isInWatchlist } = useWatchlistStore();
+    const isWatched = isInWatchlist(symbol);
 
     const { data: quoteData } = useQuery({
         queryKey: ["stockData", symbol],
@@ -215,7 +225,6 @@ const StockDetailsScreen = () => {
                                             style={{ fontFamily: "RubikMedium" }}
                                         >
                                             Total Pay: {officer.totalPay.fmt}
-
                                         </Text>
                                     )}
                                 </View>
@@ -237,6 +246,35 @@ const StockDetailsScreen = () => {
         );
     };
 
+    const handleAskAi = () => {
+        if (quoteData?.body?.[0] && processedChartData.length > 0) {
+            const stockContext = formatStockForAi(
+                {
+                    symbol,
+                    lastsale: processedChartData[processedChartData.length - 1]?.value.toString(),
+                    netchange: priceChangeData.change.toString(),
+                    pctchange: priceChangeData.percentChange.toFixed(2) + "%",
+                    name: quoteData.body[0]?.longName,
+                },
+                profileData?.body
+            );
+            setContext(stockContext);  // FIXED: SetContext → setContext
+            router.push("/(tabs)/ai-chat");  // Navigate to AI chat
+        }
+    };
+
+    const handleWatchlistPress = () => {
+
+        console.log("isWatched", isWatched);
+        if (isWatched) {
+            console.log("removeStock", symbol);
+            removeStock(symbol)
+        } else {
+            console.log("addStock", symbol);
+            addStock(symbol)
+        }
+    };
+
     return (
         <View className="flex-1">
             <StatusBar barStyle="light-content" />
@@ -255,7 +293,9 @@ const StockDetailsScreen = () => {
                         <Ionicons name="arrow-back" size={24} color="#0284c7" />
                     </Pressable>
 
-                    <Pressable className="mx-2 bg-white rounded-full p-1">
+                    <Pressable className="mx-2 bg-white rounded-full p-1"
+                        onPress={handleWatchlistPress}
+                    >
                         <Ionicons
                             name={isWatched ? "star" : "star-outline"}
                             size={24}
@@ -312,10 +352,35 @@ const StockDetailsScreen = () => {
                 </View>
             </LinearGradient>
 
-            {/* Floating Bottom Bar */ }
+            {/* Floating Bottom Bar */}
+            <Pressable
+                onPress={handleAskAi}
+                className="absolute z-[99] bottom-6 w-[90%] h-14 bg-blue-600 rounded-full items-center justify-center shadow-lg flex-row px-4"
+                style={{ alignSelf: "center" }}
+            >
+                <View className="w-10 h-10 mr-2">
+                    <Image
+                        style={{
+                            flex: 1,
+                            width: "100%",
+                            height: "100%",
+                            borderRadius: 40,
+                            backgroundColor: "white",
+                        }}
+                        source={require("../../assets/images/logo.png")}
+                        placeholder={{ blurhash }}
+                        contentFit="contain"
+                        transition={1000}
+                    />
+                </View>
 
-
-
+                <Text
+                    style={{ fontFamily: "RubikMedium" }}
+                    className="text-white text-lg"
+                >
+                    Ask Sage AI About {symbol}
+                </Text>
+            </Pressable>
         </View>
     );
 };

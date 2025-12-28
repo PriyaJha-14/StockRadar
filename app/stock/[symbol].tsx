@@ -29,12 +29,15 @@ const StockDetailsScreen = () => {
     const [showFullSummary, setShowFullSummary] = useState(false);
     const [selectedTimeFrame, setSelectedTimeFrame] = useState(0);
 
+    const { setContext } = useChatStore();
+
+    // ✅ FIX: Get the stocks array to trigger re-render
+    const { stocks, addStock, removeStock, isInWatchlist } = useWatchlistStore();
     
-
-    const { setContext } = useChatStore();  // FIXED: SetContext → setContext (lowercase)
-
-    const { addStock, removeStock, isInWatchlist } = useWatchlistStore();
-    const isWatched = isInWatchlist(symbol);
+    // ✅ FIX: Use stocks.length as dependency to force re-render
+    const isWatched = useMemo(() => {
+        return isInWatchlist(symbol);
+    }, [symbol, stocks]); // Re-calculate when stocks array changes
 
     const { data: quoteData } = useQuery({
         queryKey: ["stockData", symbol],
@@ -258,21 +261,21 @@ const StockDetailsScreen = () => {
                 },
                 profileData?.body
             );
-            setContext(stockContext);  // FIXED: SetContext → setContext
-            router.push("/(tabs)/ai-chat");  // Navigate to AI chat
+            setContext(stockContext);
+            router.push("/(tabs)/ai-chat");
         }
     };
 
     const handleWatchlistPress = () => {
-
-        console.log("isWatched", isWatched);
+        console.log("isWatched before:", isWatched);
         if (isWatched) {
-            console.log("removeStock", symbol);
-            removeStock(symbol)
+            console.log("Removing stock:", symbol);
+            removeStock(symbol);
         } else {
-            console.log("addStock", symbol);
-            addStock(symbol)
+            console.log("Adding stock:", symbol);
+            addStock(symbol);
         }
+        console.log("isWatched after:", !isWatched);
     };
 
     return (
@@ -293,7 +296,8 @@ const StockDetailsScreen = () => {
                         <Ionicons name="arrow-back" size={24} color="#0284c7" />
                     </Pressable>
 
-                    <Pressable className="mx-2 bg-white rounded-full p-1"
+                    <Pressable 
+                        className="mx-2 bg-white rounded-full p-1"
                         onPress={handleWatchlistPress}
                     >
                         <Ionicons

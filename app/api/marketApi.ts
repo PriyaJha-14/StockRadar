@@ -131,6 +131,12 @@ export interface StockModuleData {
 
 // Stock Quote
 export interface StockQuote {
+    preMarketPrice: any;
+    preMarketChange: any;
+    preMarketChangePercent: any;
+    postMarketPrice: any;
+    postMarketChange: any;
+    postMarketChangePercent: any;
     symbol: string;
     shortName: string;
     longName: string;

@@ -258,7 +258,7 @@ const WatchlistScreen = () => {
                                                     flex: 1,
                                                     width: "100%",
                                                     height: "100%",
-                                                    borderRadius: 20,
+                                                    borderRadius: 40,
                                                     backgroundColor: "white",
                                                 }}
                                                 source={require("../../assets/images/logo.png")}

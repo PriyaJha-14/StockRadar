@@ -1,157 +1,142 @@
+// app/(tabs)/ai-chat.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRef, useState } from "react";
-import { Alert, FlatList, Pressable, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
-import ChatInput from "../../components/ChatInput";
-import ChatMessage from "../../components/ChatMessage";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { blurhash } from "../index";
 import { useChatStore } from "../store/chatStore";
 
 export default function AiChatScreen() {
-  const { currentContext, messages, sendMessage, markTypingCompleted, clearChat, isLoading } = useChatStore();
+  const { currentContext, messages, sendMessage, isLoading, clearMessages, clearContext } = useChatStore();
   const flatListRef = useRef<FlatList>(null);
-
-  const handleSendMessage = async (content: string) => {
-    await sendMessage(content);
-  }
-
-
-
-
-
   const [inputText, setInputText] = useState("");
 
-  const handleTypingComplete = (messageId: string) => {
+  // Suggested questions
+  const suggestedQuestions = [
+    "What is P/E ratio?",
+    "Explain market cap",
+    "How to analyze stocks?",
+  ];
 
-    markTypingCompleted(messageId);
-  }
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
 
+  const handleClearChat = () => {
+    Alert.alert(
+      "Clear Chat",
+      "Are you sure you want to delete all messages?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            clearMessages();
+            clearContext();
+          },
+        },
+      ]
+    );
+  };
 
-  const renderMessage = ({ item }: { item: any }) => (
-    <ChatMessage message={item} onTypingComplete={handleTypingComplete} />
-  )
-
-
+  const handleSuggestionPress = (question: string) => {
+    setInputText(question);
+  };
 
   const renderEmptyState = () => (
     <View className="flex-1 items-center justify-center px-8">
-      <View className="w-20 h-20 mb-4">
+      <View className="w-24 h-24 mb-6">
         <Image
           style={{
             flex: 1,
             width: "100%",
             height: "100%",
-            borderRadius: 12,
+            borderRadius: 16,
             backgroundColor: "white",
           }}
-          source={require("../assets/images/logo.png")}
+          source={require("../../assets/images/logo.png")}
           placeholder={{ blurhash }}
           contentFit="contain"
           transition={1000}
         />
       </View>
       <Text
-        className="text-white text-2xl text-center"
+        className="text-white text-2xl text-center mb-3"
         style={{ fontFamily: "RubikBold" }}
       >
-        Sage AI
+        Ask Sage AI
       </Text>
-
-      <Text className="text-white/70 text-center text-base mb-8 leading-6"
+      <Text
+        className="text-white/60 text-center text-base leading-6"
         style={{ fontFamily: "RubikRegular" }}
       >
-        Ask me anything about stocks, market trends, or your investment portfolio. I'll provide educational insights to help you make informed decisions.
+        Get instant insights about stocks, market trends, and investment strategies.
       </Text>
-
-      <View className="bg-white/10 rounded-xl p-4 mb-6">
-
-        <Text
-          className="text-white text-sm mb-3"
-        >
-          Try Asking:
-
-        </Text>
-
-        <View className="space-y-2">
-
-          <Text className="text-white/80 text-sm">
-            * "Should I buy Apple Stock?"
-          </Text>
-
-          <Text className="text-white/80 text-sm">
-            * "What's happening with tech stocks"
-          </Text>
-
-          <Text className="text-white/80 text-sm">
-            * "Analyze My Portfolio"
-          </Text>
-
-          <Text className="text-white/80 text-sm">
-            * "Explain the recent market movements"
-          </Text>
-
-        </View>
-
-
-
-      </View>
-
-      <View
-        className="bg-yellow-500/20 rounded-lg p-3 border border-yellow-400/30"
-      >
-        <Text className="text-yellow-200 text-xs text-center"
-          style={{ fontFamily: "RubikMedium" }}
-        >
-          Educational Pusposes Only. Not for financial advices.
-        </Text>
-      </View>
     </View>
   );
 
-  const handleClearChat = () => {
-
-    Alert.alert("Clear Chat", "Are you sure you want to clear all messages?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Clear", style: "destructive", onPress: clearChat },
-    ])
+  const renderMessage = ({ item }: { item: any }) => {
+    const isUser = item.role === "user";
+    return (
+      <View className={`mb-4 ${isUser ? "items-end" : "items-start"}`}>
+        <View
+          className={`max-w-[80%] p-4 rounded-2xl ${
+            isUser ? "bg-blue-600" : "bg-white/10"
+          }`}
+        >
+          <Text
+            className="text-white text-sm leading-6"
+            style={{ fontFamily: "RubikRegular" }}
+          >
+            {item.content}
+          </Text>
+        </View>
+        <Text className="text-white/40 text-xs mt-1 mx-2" style={{ fontFamily: "RubikRegular" }}>
+          {new Date(item.timestamp).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })}
+        </Text>
+      </View>
+    );
   };
 
-  //   const renderMessage = ({ item }: { item: any }) => {
-  //     const isUser = item.role === "user";
-  //     return (
-  //       <View
-  //         className={`mb-4 ${isUser ? "items-end" : "items-start"}`}
-  //       >
-  //         <View
-  //           className={`max-w-[80%] p-3 rounded-2xl ${
-  //             isUser ? "bg-blue-600" : "bg-white/10"
-  //           }`}
-  //         >
-  //           <Text
-  //             className="text-white"
-  //             style={{ fontFamily: "RubikRegular" }}
-  //           >
-  //             {item.content}
-  //           </Text>
-  //         </View>
-  //       </View>
-  //     );
-  //   };
-
-  const handleSend = () => {
-    if (inputText.trim()) {
-      sendMessage(inputText);
+  const handleSend = async () => {
+    if (inputText.trim() && !isLoading) {
+      const message = inputText.trim();
       setInputText("");
-      // Scroll to bottom after sending message
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+
+      await sendMessage(message);
     }
   };
 
   return (
-    <View className="flex-1">
+    <KeyboardAvoidingView 
+      className="flex-1"
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       <StatusBar barStyle="light-content" />
 
       <LinearGradient
@@ -160,12 +145,11 @@ export default function AiChatScreen() {
         end={{ x: 0, y: 1 }}
         className="h-full"
       >
-        <View className="flex-row items-center justify-between">
-
-          {/* Header */}
-          <View className="pt-16 pb-4 px-4">
+        {/* Header */}
+        <View className="pt-16 pb-4 px-4 border-b border-white/10">
+          <View className="flex-row items-center justify-between">
             <View className="flex-row items-center">
-              <View className="w-10 h-10 mr-2">
+              <View className="w-10 h-10 mr-3">
                 <Image
                   style={{
                     flex: 1,
@@ -174,7 +158,7 @@ export default function AiChatScreen() {
                     borderRadius: 12,
                     backgroundColor: "white",
                   }}
-                  source={require("../assets/images/logo.png")}
+                  source={require("../../assets/images/logo.png")}
                   placeholder={{ blurhash }}
                   contentFit="contain"
                   transition={1000}
@@ -183,7 +167,7 @@ export default function AiChatScreen() {
 
               <View>
                 <Text
-                  className="text-white text-lg"
+                  className="text-white text-xl"
                   style={{ fontFamily: "RubikBold" }}
                 >
                   Sage AI
@@ -199,18 +183,18 @@ export default function AiChatScreen() {
               </View>
             </View>
 
-            {
-              messages.length > 0 && (
-                <TouchableOpacity onPress={handleClearChat} className="w-10 h-10 rounded-full bg-white/10 items-center justify-center">
-                  <Ionicons name="trash-outline" size={18} color="white" />
-
-                </TouchableOpacity>
-              )
-            }
+            {/* Delete Button */}
+            {messages.length > 0 && (
+              <Pressable 
+                onPress={handleClearChat}
+                className="p-2 bg-white/10 rounded-full"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </Pressable>
+            )}
           </View>
         </View>
-
-
 
         {/* Messages */}
         <View className="flex-1">
@@ -222,7 +206,7 @@ export default function AiChatScreen() {
               data={messages}
               renderItem={renderMessage}
               keyExtractor={(item) => item.id}
-              className="flex-1 px-4"
+              className="flex-1 px-4 pt-4"
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 paddingBottom: 20,
@@ -231,53 +215,71 @@ export default function AiChatScreen() {
           )}
         </View>
 
-        {/* Input Area */}
-        <View className="px-4 pb-8 pt-2">
+        {/* Input Area + Suggestions */}
+        <View className="px-4 pb-8 pt-2 border-t border-white/10">
+          {/* Suggested Questions - Shows when no messages OR when input is empty */}
+          {(messages.length === 0 || !inputText) && (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              className="mb-3"
+            >
+              {suggestedQuestions.map((question, index) => (
+                <Pressable
+                  key={index}
+                  onPress={() => handleSuggestionPress(question)}
+                  className="bg-white/10 rounded-full px-4 py-2 mr-2 border border-white/20"
+                  disabled={isLoading}
+                >
+                  <Text 
+                    className="text-white/80 text-sm" 
+                    style={{ fontFamily: "RubikMedium" }}
+                  >
+                    {question}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Input Box */}
           <View className="bg-white/10 rounded-2xl flex-row items-center px-4 py-2">
             <TextInput
               value={inputText}
               onChangeText={setInputText}
-              placeholder="Ask about stocks..."
-              placeholderTextColor="#ffffff70"
-              className="flex-1 text-white text-base py-2"
+              placeholder={
+                currentContext 
+                  ? `Ask about ${currentContext.symbol}...` 
+                  : "Ask about stocks..."
+              }
+              placeholderTextColor="#ffffff50"
+              className="flex-1 text-white text-base py-2 max-h-24"
               style={{ fontFamily: "RubikRegular" }}
               multiline
               maxLength={500}
+              editable={!isLoading}
+              onSubmitEditing={handleSend}
             />
             <Pressable
               onPress={handleSend}
-              disabled={!inputText.trim()}
-              className={`ml-2 w-10 h-10 rounded-full items-center justify-center ${inputText.trim() ? "bg-blue-600" : "bg-white/20"
-                }`}
+              disabled={!inputText.trim() || isLoading}
+              className={`ml-2 w-10 h-10 rounded-full items-center justify-center ${
+                inputText.trim() && !isLoading ? "bg-blue-600" : "bg-white/20"
+              }`}
             >
-              <Ionicons
-                name="send"
-                size={20}
-                color={inputText.trim() ? "white" : "#ffffff50"}
-              />
+              {isLoading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color={inputText.trim() ? "white" : "#ffffff50"}
+                />
+              )}
             </Pressable>
           </View>
-
-          {/* Loading Indicator/Chat Bubble */}
-
-          {
-            isLoading && (
-              <View className="px-4">
-
-                {/* <TypingBubble /> */}
-              </View>
-            )
-          }
-
-          {/*Chat Input */}
-
-          <ChatInput
-            onSendMessage={handleSendMessage}
-            isLoading={isLoading}
-            currentStock={currentContext?.symbol}
-          />
         </View>
       </LinearGradient>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

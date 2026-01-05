@@ -122,12 +122,14 @@ export async function sendAIRequest({
 
         // Make Google Api call using new @google/genai format
 
+        // Make Google Api call using new @google/genai format
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-001",
+            model: "gemini-2.5-flash-lite",  // ✅ CHANGED: Better rate limits
             contents: fullPrompt,
         });
 
         const aiMessage = response.text || "Sorry, i could not generate a response ";
+
 
 
         // Extract suggestions from the response

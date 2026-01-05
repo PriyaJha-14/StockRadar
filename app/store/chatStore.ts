@@ -1,100 +1,126 @@
-// import { prefetch } from "expo-router/build/global-state/routing";
-import { ChatMessage, ChatStore } from "@/types/chat";
+// app/store/chatStore.ts
+import { sendAIRequest, StockContext } from "@/utils/aiService";
 import { create } from "zustand";
-import { sendAIRequest } from "../../utils/aiService";
+
+export interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
+
+interface ChatStore {
+  messages: Message[];
+  currentContext: StockContext | null;
+  isLoading: boolean;
+  error: string | null;
+  
+  setContext: (context: StockContext | null) => void;
+  sendMessage: (content: string) => Promise<void>;
+  clearMessages: () => void;
+  clearContext: () => void;
+}
 
 export const useChatStore = create<ChatStore>((set, get) => ({
-    messages: [],
-    isLoading: false,
-    currentContext: undefined,
+  messages: [],
+  currentContext: null,
+  isLoading: false,
+  error: null,
 
-    addMessage: (message) => {
-        const newMessage: ChatMessage = {
-            ...message,
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-            timestamp: new Date(),
-        };
+  setContext: (context) => {
+    console.log("📊 Setting stock context:", context?.symbol);
+    set({ currentContext: context });
+  },
 
-        set((state) => ({
-            messages: [...state.messages, newMessage],
-        }));
-    },
+  sendMessage: async (content: string) => {
+    const { messages, currentContext } = get();
 
-    setLoading: (loading) => set({ isLoading: loading }),
+    console.log("💬 User message:", content);
 
-    setContext: (context) => set({ currentContext: context }),
+    // Add user message immediately
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content,
+      timestamp: new Date(),
+    };
 
-    clearChat: () => set({ messages: [], currentContext: undefined }),
+    set({
+      messages: [...messages, userMessage],
+      isLoading: true,
+      error: null,
+    });
 
-    markTypingCompleted: (messageId) => {
-        set((state) => ({
-            messages: state.messages.map((msg) => 
-                msg.id === messageId ? { ...msg, typingCompleted: true } : msg
-            ),
-        }));
-    },
+    try {
+      console.log("🤖 Calling AI API...");
+      
+      // Call AI service
+      const aiResponse = await sendAIRequest({
+        userMessage: content,
+        stockContext: currentContext!,
+        conversationHistory: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
+      });
 
-    sendMessage: async (content, context) => {
-        const state = get();
+      console.log("✅ Got AI response");
 
-        const userMessage: ChatMessage = {
-            role: "user",
-            content,
-            stockContext: context || state.currentContext,
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-            timestamp: new Date(),
-        };
+      // Add AI message
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: aiResponse.message,
+        timestamp: new Date(),
+      };
 
-        set((prevState) => ({
-            messages: [...prevState.messages, userMessage],
-            isLoading: true,
-        }));
+      set((state) => ({
+        messages: [...state.messages, aiMessage],
+        isLoading: false,
+      }));
 
-        try {
-            const updatedState = get();
+    } catch (error: any) {
+      console.error("❌ Error in sendMessage:", error);
+      
+      set({
+        error: error.message || "Failed to get response",
+        isLoading: false,
+      });
 
-            // Prepare conversation history for context
-            const conversationHistory = updatedState.messages.slice(-6).map((msg) => ({
-                role: msg.role as "user" | "assistant",
-                content: msg.content,
-            }));
+      // Better error messages
+      let errorText = "Sorry, I encountered an error.";
+      
+      if (error.message?.includes("rate limit") || error.message?.includes("quota")) {
+        errorText = "⏳ Rate limit reached. Please wait a minute and try again.";
+      } else if (error.message?.includes("network") || error.message?.includes("fetch")) {
+        errorText = "🌐 Network error. Please check your internet connection.";
+      } else {
+        errorText = "❌ Sorry, something went wrong. Please try again.";
+      }
 
-            // Send request to AI Service
-            const aiResponse = await sendAIRequest({
-                userMessage: content,
-                stockContext: context || state.currentContext,
-                conversationHistory,
-            });
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: errorText,
+        timestamp: new Date(),
+      };
 
-            // Add AI response 
-            const assistantMessage: ChatMessage = {
-                role: "assistant",
-                content: aiResponse.message,
-                stockContext: context || state.currentContext,
-                id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-                timestamp: new Date(),
-            };
+      set((state) => ({
+        messages: [...state.messages, errorMessage],
+      }));
+    }
+  },
 
-            set((prevState) => ({
-                messages: [...prevState.messages, assistantMessage],
-                isLoading: false,
-            }));
+  // ✅ ADD THIS: Clear all messages
+  clearMessages: () => {
+    console.log("🗑️ Clearing all messages");
+    set({ messages: [], error: null });
+  },
 
-        } catch (error) {
-            console.error("Error sending AI message:", error);
-
-            // Add error message
-            const errorMessage: ChatMessage = {
-                role: "assistant",
-                content: "I'm sorry, I encountered an error processing your request. Please try again later.\n\nThis Analysis is for educational purposes only and should not be considered financial advice.",
-                id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-                timestamp: new Date(),
-            };
-
-            set((prevState) => ({
-                messages: [...prevState.messages, errorMessage],
-                isLoading: false,
-            }));
-        }
-    },
+  // ✅ ADD THIS: Clear stock context
+  clearContext: () => {
+    console.log("🗑️ Clearing stock context");
+    set({ currentContext: null });
+  },
 }));

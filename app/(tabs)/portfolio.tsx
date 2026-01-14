@@ -1,5 +1,4 @@
 // app/(tabs)/portfolio.tsx
-// import { fetchStockQuotes } from "@/utils/apiHelpers";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -7,12 +6,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect } from "react";
 import {
-    Alert,
-    FlatList,
-    Pressable,
-    StatusBar,
-    Text,
-    View
+  Alert,
+  FlatList,
+  Pressable,
+  StatusBar,
+  Text,
+  View
 } from "react-native";
 import { fetchStockQuotes } from "../api/marketApi";
 import { blurhash } from "../index";
@@ -59,7 +58,7 @@ export default function PortfolioScreen() {
   const totalProfit = getTotalProfit();
   const profitPercentage = ((totalProfit / 100000) * 100).toFixed(2);
 
-  // ✅ Handle AI Portfolio Analysis
+  // ✅ FIXED: Handle AI Portfolio Analysis
   const handleAnalyzePortfolio = () => {
     if (holdings.length === 0) {
       Alert.alert(
@@ -71,15 +70,8 @@ export default function PortfolioScreen() {
 
     const portfolioSummary = getPortfolioSummary();
     
-    // Set context for AI chat
-    setContext({
-      symbol: "PORTFOLIO",
-      currentPrice: totalValue,
-      change: totalProfit,
-      percentChange: parseFloat(profitPercentage),
-      companyName: "My Portfolio",
-      summary: portfolioSummary,
-    });
+    // ✅ FIXED: setContext expects a string, not an object
+    setContext(portfolioSummary);
 
     // Navigate to AI Chat
     router.push("/(tabs)/ai-chat");
@@ -333,7 +325,7 @@ export default function PortfolioScreen() {
             keyExtractor={(item) => item.id}
             className="flex-1 px-4 pt-2"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={{ paddingBottom: 100 }}
           />
         )}
       </LinearGradient>

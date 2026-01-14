@@ -18,6 +18,7 @@ interface PortfolioStore {
   virtualCash: number;
   
   addHolding: (holding: Omit<PortfolioHolding, "id" | "buyDate">) => void;
+  buyStock: (symbol: string, quantity: number, price: number) => void; // ✅ FIXED: Proper declaration
   removeHolding: (id: string) => void;
   updateHolding: (id: string, quantity: number) => void;
   sellHolding: (id: string, quantity: number, sellPrice: number) => void;
@@ -33,6 +34,55 @@ export const usePortfolioStore = create<PortfolioStore>()(
     (set, get) => ({
       holdings: [],
       virtualCash: 100000, // Starting with $100,000 virtual cash
+
+      // ✅ NEW: Simplified buyStock function
+      buyStock: (symbol, quantity, price) => {
+        const cost = quantity * price;
+        const { virtualCash, holdings } = get();
+
+        if (cost > virtualCash) {
+          console.warn("⚠️ Insufficient virtual cash");
+          return false;
+        }
+
+        // Check if stock already exists in portfolio
+        const existingHolding = holdings.find(h => h.symbol === symbol);
+
+        if (existingHolding) {
+          // Update existing holding (average price)
+          const totalQuantity = existingHolding.quantity + quantity;
+          const totalCost = (existingHolding.buyPrice * existingHolding.quantity) + cost;
+          const newAvgPrice = totalCost / totalQuantity;
+
+          set({
+            holdings: holdings.map(h =>
+              h.symbol === symbol
+                ? { ...h, quantity: totalQuantity, buyPrice: newAvgPrice }
+                : h
+            ),
+            virtualCash: virtualCash - cost,
+          });
+        } else {
+          // Add new holding
+          const newHolding: PortfolioHolding = {
+            id: Date.now().toString(),
+            symbol,
+            companyName: symbol, // Will be updated with full name later
+            quantity,
+            buyPrice: price,
+            buyDate: new Date(),
+            currentPrice: price,
+          };
+
+          set({
+            holdings: [...holdings, newHolding],
+            virtualCash: virtualCash - cost,
+          });
+        }
+
+        console.log("✅ Bought stock:", symbol, quantity, "@", price);
+        return true;
+      },
 
       addHolding: (holding) => {
         const cost = holding.quantity * holding.buyPrice;
@@ -127,7 +177,6 @@ export const usePortfolioStore = create<PortfolioStore>()(
         }, 0);
       },
 
-      // ✅ NEW: Get portfolio summary for AI analysis
       getPortfolioSummary: () => {
         const { holdings, virtualCash } = get();
         

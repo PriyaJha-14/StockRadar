@@ -40,8 +40,8 @@ const StockDetailsScreen = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [showFullSummary, setShowFullSummary] = useState(false);
   const [selectedTimeFrame, setSelectedTimeFrame] = useState(0);
-  const [showBuyModal, setShowBuyModal] = useState(false); // ✅ NEW: Modal state
-  const [buyQuantity, setBuyQuantity] = useState(""); // ✅ NEW: Quantity input
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [buyQuantity, setBuyQuantity] = useState("");
 
   const { setContext } = useChatStore();
   const { buyStock, virtualCash } = usePortfolioStore();
@@ -51,13 +51,13 @@ const StockDetailsScreen = () => {
     return isInWatchlist(symbol);
   }, [symbol, stocks]);
 
-  const { data: quoteData } = useQuery({
+  const { data: quoteData, isLoading: isQuoteLoading } = useQuery({
     queryKey: ["stockData", symbol],
     queryFn: () => fetchStockQuotes([symbol as string]),
     enabled: !!symbol,
   });
 
-  const { data: historyData } = useQuery({
+  const { data: historyData, isLoading: isHistoryLoading } = useQuery({
     queryKey: ["stockHistory", symbol, timeFrames[selectedTimeFrame].interval],
     queryFn: () =>
       fetchStockHistory(
@@ -73,31 +73,55 @@ const StockDetailsScreen = () => {
     enabled: !!symbol,
   });
 
+  // ✅ FIXED: Safe chart data processing
   const processedChartData = useMemo(() => {
     if (!historyData?.body) return [];
-    return Object.entries(historyData.body).map(([timestamp, data]) => ({
-      timestamp: parseInt(timestamp),
-      date: new Date(parseInt(timestamp) * 1000),
-      open: data.open,
-      high: data.high,
-      low: data.low,
-      close: data.close,
-      value: data.close,
-      volume: data.volume,
-    }));
+    
+    try {
+      return Object.entries(historyData.body).map(([timestamp, data]: [string, any]) => ({
+        timestamp: parseInt(timestamp),
+        date: new Date(parseInt(timestamp) * 1000),
+        open: data?.open || 0,
+        high: data?.high || 0,
+        low: data?.low || 0,
+        close: data?.close || 0,
+        value: data?.close || 0,
+        volume: data?.volume || 0,
+      }));
+    } catch (error) {
+      console.error('Error processing chart data:', error);
+      return [];
+    }
   }, [historyData]);
 
+  // ✅ FIXED: Safe price change calculation
   const priceChangeData = useMemo(() => {
-    if (processedChartData.length === 0)
+    if (processedChartData.length === 0) {
       return { change: 0, percentChange: 0, isPositive: false };
-    const firstPrice = processedChartData[0]?.value || 0;
-    const lastPrice = processedChartData[processedChartData.length - 1]?.value || 0;
-    const change = lastPrice - firstPrice;
-    const percentChange = (change / firstPrice) * 100;
-    return { change, percentChange, isPositive: change > 0 };
+    }
+
+    try {
+      const firstPrice = processedChartData[0]?.value || 0;
+      const lastPrice = processedChartData[processedChartData.length - 1]?.value || 0;
+      
+      if (firstPrice === 0) {
+        return { change: 0, percentChange: 0, isPositive: false };
+      }
+
+      const change = lastPrice - firstPrice;
+      const percentChange = (change / firstPrice) * 100;
+      
+      return { 
+        change: isNaN(change) ? 0 : change, 
+        percentChange: isNaN(percentChange) ? 0 : percentChange, 
+        isPositive: change > 0 
+      };
+    } catch (error) {
+      console.error('Error calculating price change:', error);
+      return { change: 0, percentChange: 0, isPositive: false };
+    }
   }, [processedChartData]);
 
-  // ✅ FIXED: Open modal instead of Alert.prompt
   const handleBuyStock = () => {
     const quote = quoteData?.body?.[0];
     if (!quote?.regularMarketPrice) {
@@ -108,7 +132,6 @@ const StockDetailsScreen = () => {
     setBuyQuantity("");
   };
 
-  // ✅ NEW: Process the buy
   const processBuy = () => {
     const quote = quoteData?.body?.[0];
     if (!quote?.regularMarketPrice) {
@@ -285,7 +308,7 @@ const StockDetailsScreen = () => {
       const stockContext = formatStockForAi(
         {
           symbol,
-          lastsale: processedChartData[processedChartData.length - 1]?.value.toString(),
+          lastsale: processedChartData[processedChartData.length - 1]?.value?.toString() || "0",
           netchange: priceChangeData.change.toString(),
           pctchange: priceChangeData.percentChange.toFixed(2) + "%",
           name: quoteData.body[0]?.longName,
@@ -307,8 +330,28 @@ const StockDetailsScreen = () => {
     }
   };
 
+  // ✅ FIXED: Safe price extraction
   const currentPrice = quoteData?.body?.[0]?.regularMarketPrice || 0;
   const maxShares = currentPrice > 0 ? Math.floor(virtualCash / currentPrice) : 0;
+
+  // ✅ FIXED: Safe display price
+  const displayPrice = processedChartData.length > 0
+    ? (processedChartData[processedChartData.length - 1]?.value || 0).toFixed(2)
+    : (quoteData?.body?.[0]?.regularMarketPrice || 0).toFixed(2);
+
+  // ✅ FIXED: Show loading state
+  if (isQuoteLoading || isHistoryLoading) {
+    return (
+      <LinearGradient colors={["#00194b", "#0C0C0C"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} className="flex-1">
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="white" />
+          <Text className="text-white mt-4" style={{ fontFamily: "RubikMedium" }}>
+            Loading {symbol}...
+          </Text>
+        </View>
+      </LinearGradient>
+    );
+  }
 
   return (
     <View className="flex-1">
@@ -336,9 +379,7 @@ const StockDetailsScreen = () => {
             </View>
             <View>
               <Text className="text-2xl font-bold text-white text-right">
-                ${processedChartData.length > 0
-                  ? processedChartData[processedChartData.length - 1].value.toFixed(2)
-                  : quoteData?.body?.[0]?.regularMarketPrice?.toFixed(2) || "--"}
+                ${displayPrice}
               </Text>
               <View className="flex-row items-center mt-1 justify-end">
                 <Text
@@ -361,7 +402,7 @@ const StockDetailsScreen = () => {
         </View>
       </LinearGradient>
 
-      {/* ✅ Buy Modal */}
+      {/* Buy Modal */}
       <Modal visible={showBuyModal} transparent animationType="slide">
         <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View className="bg-white rounded-t-3xl p-6">

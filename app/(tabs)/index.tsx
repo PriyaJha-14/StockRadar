@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useRouter } from "expo-router";
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View
@@ -74,6 +75,7 @@ type MarketType = "STOCKS" | "ETF" | "MUTUALFUNDS" | "FUTURES";
 
 export default function HomeScreen() {
   const [selectedMarket, setSelectedMarket] = useState<MarketType>("STOCKS");
+  const routerNav = useRouter();
 
   // Recent stocks query with rate limit protection
   const { 
@@ -168,6 +170,21 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* Search Button */}
+          <TouchableOpacity
+            style={styles.searchButton}
+            onPress={() => routerNav.push('/search')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.searchButtonContent}>
+              <Ionicons name="search" size={22} color="#fff" />
+              <Text style={styles.searchButtonText}>
+                Search Stocks (US & India 🇺🇸 🇮🇳)
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -448,3 +465,29 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  searchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 122, 255, 0.2)',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.3)',
+  },
+  searchButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  searchButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    marginLeft: 12,
+    fontWeight: '600',
+    fontFamily: 'RubikSemiBold',
+  },
+});

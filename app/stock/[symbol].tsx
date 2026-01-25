@@ -1,5 +1,6 @@
 // app/stock/[symbol].tsx
 import { formatStockForAi } from "@/utils/aiService";
+import { useRealtimePrice } from "@/utils/realtimeApi"; // ✅ NEW: Import real-time hook
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -47,6 +48,9 @@ const StockDetailsScreen = () => {
   const { buyStock, virtualCash } = usePortfolioStore();
   const { stocks, addStock, removeStock, isInWatchlist } = useWatchlistStore();
 
+  // ✅ NEW: Get real-time data (silently falls back to Yahoo Finance if unavailable)
+  const { liveData, loading: liveLoading } = useRealtimePrice(symbol);
+
   const isWatched = useMemo(() => {
     return isInWatchlist(symbol);
   }, [symbol, stocks]);
@@ -73,7 +77,6 @@ const StockDetailsScreen = () => {
     enabled: !!symbol,
   });
 
-  // ✅ FIXED: Safe chart data processing
   const processedChartData = useMemo(() => {
     if (!historyData?.body) return [];
     
@@ -94,7 +97,6 @@ const StockDetailsScreen = () => {
     }
   }, [historyData]);
 
-  // ✅ FIXED: Safe price change calculation
   const priceChangeData = useMemo(() => {
     if (processedChartData.length === 0) {
       return { change: 0, percentChange: 0, isPositive: false };
@@ -330,16 +332,10 @@ const StockDetailsScreen = () => {
     }
   };
 
-  // ✅ FIXED: Safe price extraction
   const currentPrice = quoteData?.body?.[0]?.regularMarketPrice || 0;
   const maxShares = currentPrice > 0 ? Math.floor(virtualCash / currentPrice) : 0;
 
-  // ✅ FIXED: Safe display price
-  const displayPrice = processedChartData.length > 0
-    ? (processedChartData[processedChartData.length - 1]?.value || 0).toFixed(2)
-    : (quoteData?.body?.[0]?.regularMarketPrice || 0).toFixed(2);
-
-  // ✅ FIXED: Show loading state
+  // Show loading state
   if (isQuoteLoading || isHistoryLoading) {
     return (
       <LinearGradient colors={["#00194b", "#0C0C0C"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} className="flex-1">
@@ -368,27 +364,52 @@ const StockDetailsScreen = () => {
         </View>
 
         <View className="h-full px-4">
+          {/* ✅ UPDATED: Price Display Section with Real-time Data */}
           <View className="flex-row items-center justify-between py-4">
             <View className="flex-1 mr-4">
-              <Text className="text-2xl text-white" style={{ fontFamily: "RubikBold" }}>{symbol}</Text>
+              <Text className="text-2xl text-white" style={{ fontFamily: "RubikBold" }}>
+                {symbol}
+              </Text>
               {quoteData?.body?.[0]?.longName && (
                 <Text className="text-white/80 text-base" style={{ fontFamily: "RubikMedium" }} numberOfLines={1}>
                   {quoteData.body[0]?.longName}
                 </Text>
               )}
             </View>
+            
             <View>
+              {/* Price - Auto-selects best data source (Real-time > Chart > Quote) */}
               <Text className="text-2xl font-bold text-white text-right">
-                ${displayPrice}
+                ${(() => {
+                  // Priority 1: Real-time data (if available)
+                  if (liveData?.price) return liveData.price.toFixed(2);
+                  
+                  // Priority 2: Chart data
+                  if (processedChartData.length > 0) {
+                    return processedChartData[processedChartData.length - 1]?.value.toFixed(2);
+                  }
+                  
+                  // Priority 3: Quote data
+                  return (quoteData?.body?.[0]?.regularMarketPrice || 0).toFixed(2);
+                })()}
               </Text>
+              
+              {/* Change & Percent Change - Auto-selects best data source */}
               <View className="flex-row items-center mt-1 justify-end">
                 <Text
-                  className={`text-base ${priceChangeData.isPositive ? "text-green-500" : "text-red-500"}`}
+                  className={`text-base ${(() => {
+                    const change = liveData?.change ?? priceChangeData.change;
+                    return change >= 0 ? "text-green-500" : "text-red-500";
+                  })()}`}
                   style={{ fontFamily: "RubikBold" }}
                 >
-                  {priceChangeData.isPositive ? "+" : ""}
-                  {priceChangeData.change.toFixed(2)} ({priceChangeData.isPositive ? "+" : ""}
-                  {priceChangeData.percentChange.toFixed(2)}%)
+                  {(() => {
+                    const change = liveData?.change ?? priceChangeData.change;
+                    const percentChange = liveData?.percentChange ?? priceChangeData.percentChange;
+                    const isPositive = change >= 0;
+                    
+                    return `${isPositive ? "+" : ""}${change.toFixed(2)} (${isPositive ? "+" : ""}${percentChange.toFixed(2)}%)`;
+                  })()}
                 </Text>
               </View>
             </View>

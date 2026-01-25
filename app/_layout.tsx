@@ -1,20 +1,20 @@
 // app/_layout.tsx
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import "../global.css";
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Create QueryClient instance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000,    // ✅ Changed from cacheTime to gcTime
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,   
       refetchOnWindowFocus: false,
     },
   },

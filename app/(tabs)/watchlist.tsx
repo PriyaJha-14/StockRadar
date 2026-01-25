@@ -7,16 +7,16 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useRef } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    FlatList,
-    Pressable,
-    ScrollView,
-    StatusBar,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import { fetchStockQuotes } from "../api/marketApi";
@@ -37,7 +37,7 @@ const WatchlistScreen = () => {
     staleTime: 1000 * 60 * 1,
   });
 
-  // ✅ FULL IMPLEMENTATION: Analyze entire watchlist with AI
+ 
   const handleAnalyzePortfolio = () => {
     if (!quotes?.body || stocks.length === 0) {
       Alert.alert(

@@ -13,8 +13,8 @@ export default function TabLayout() {
           backgroundColor: "#0C0C0C",
           borderTopColor: "#1f2937",
           borderTopWidth: 1,
-          height: 80, // ✅ Fixed height
-          paddingBottom: 20, // ✅ More bottom padding
+          height: 80, 
+          paddingBottom: 20,
           paddingTop: 10,
         },
         tabBarLabelStyle: {

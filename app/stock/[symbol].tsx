@@ -1,6 +1,6 @@
 // app/stock/[symbol].tsx
 import { formatStockForAi } from "@/utils/aiService";
-import { useRealtimePrice } from "@/utils/realtimeApi"; // ✅ NEW: Import real-time hook
+import { useRealtimePrice } from "@/utils/realtimeApi";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -19,6 +19,14 @@ import {
   View,
 } from "react-native";
 import { blurhash } from "../../app/index";
+import {
+  calculateHealthScore,
+  fetchFinancialSummary,
+  formatLargeNumber,
+  formatNumber,
+  formatPercentage,
+  getHealthScoreInfo
+} from "../api/financialApi";
 import { fetchStockHistory, fetchStockModule, fetchStockQuotes } from "../api/marketApi";
 import { useChatStore } from "../store/chatStore";
 import { usePortfolioStore } from "../store/portfolioStore";
@@ -48,7 +56,6 @@ const StockDetailsScreen = () => {
   const { buyStock, virtualCash } = usePortfolioStore();
   const { stocks, addStock, removeStock, isInWatchlist } = useWatchlistStore();
 
-  // ✅ NEW: Get real-time data (silently falls back to Yahoo Finance if unavailable)
   const { liveData, loading: liveLoading } = useRealtimePrice(symbol);
 
   const isWatched = useMemo(() => {
@@ -75,6 +82,13 @@ const StockDetailsScreen = () => {
     queryKey: ["stockModule", symbol, "all"],
     queryFn: () => fetchStockModule(symbol as string, "asset-profile"),
     enabled: !!symbol,
+  });
+
+  const { data: financialData, isPending: isFinancialLoading } = useQuery({
+    queryKey: ["financialSummary", symbol],
+    queryFn: () => fetchFinancialSummary(symbol as string),
+    enabled: !!symbol && activeTab === 1,
+    staleTime: 1000 * 60 * 30,
   });
 
   const processedChartData = useMemo(() => {
@@ -296,12 +310,322 @@ const StockDetailsScreen = () => {
   };
 
   const renderFinancialsTab = () => {
+    if (isFinancialLoading) {
+      return (
+        <View className="py-8 items-center">
+          <ActivityIndicator size="large" color="white" />
+          <Text className="text-white mt-2" style={{ fontFamily: "RubikMedium" }}>
+            Loading financial data...
+          </Text>
+        </View>
+      );
+    }
+
+    if (!financialData) {
+      return (
+        <View className="p-4">
+          <Text className="text-white text-center" style={{ fontFamily: "RubikMedium" }}>
+            No financial data available for {symbol}
+          </Text>
+        </View>
+      );
+    }
+
+    const healthScore = calculateHealthScore(financialData.financialData);
+    const healthInfo = getHealthScoreInfo(healthScore);
+    const stats = financialData.keyStatistics;
+    const finData = financialData.financialData;
+
     return (
-      <View className="p-4">
-        <Text className="text-white text-center" style={{ fontFamily: "RubikMedium" }}>
-          Financials data coming soon
-        </Text>
-      </View>
+      <ScrollView className="p-4" showsVerticalScrollIndicator={false}>
+        {/* Financial Health Score */}
+        <View className="bg-white/10 rounded-xl p-4 mb-4">
+          <Text className="text-white text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
+            {healthInfo.emoji} Financial Health Score
+          </Text>
+          
+          <View className="flex-row items-center mb-2">
+            <View className="flex-1 h-3 bg-white/20 rounded-full overflow-hidden mr-3">
+              <View 
+                className="h-full rounded-full" 
+                style={{ 
+                  width: `${healthScore}%`, 
+                  backgroundColor: healthInfo.color 
+                }} 
+              />
+            </View>
+            <Text className="text-white text-2xl" style={{ fontFamily: "RubikBold" }}>
+              {healthScore}
+            </Text>
+          </View>
+          
+          <Text className="text-white/80" style={{ fontFamily: "RubikMedium" }}>
+            {healthInfo.label} - {
+              healthScore >= 80 ? "Strong fundamentals with healthy financials" :
+              healthScore >= 60 ? "Good financial position with room for improvement" :
+              healthScore >= 40 ? "Average financial health, monitor closely" :
+              "Financial metrics need attention"
+            }
+          </Text>
+        </View>
+
+        {/* Key Metrics */}
+        <View className="mb-4">
+          <Text className="text-white text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
+            📊 Key Metrics
+          </Text>
+          <View className="bg-white rounded-xl p-4">
+            {stats?.marketCap && (
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Market Cap</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>{formatLargeNumber(stats.marketCap)}</Text>
+              </View>
+            )}
+            {stats?.trailingPE && (
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>P/E Ratio (TTM)</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>{formatNumber(stats.trailingPE)}</Text>
+              </View>
+            )}
+            {stats?.forwardPE && (
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Forward P/E</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>{formatNumber(stats.forwardPE)}</Text>
+              </View>
+            )}
+            {stats?.beta && (
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Beta</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>{formatNumber(stats.beta, 3)}</Text>
+              </View>
+            )}
+            {stats?.bookValue && (
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Book Value</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>${formatNumber(stats.bookValue)}</Text>
+              </View>
+            )}
+            {stats?.fiftyTwoWeekHigh && (
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>52 Week High</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>${formatNumber(stats.fiftyTwoWeekHigh)}</Text>
+              </View>
+            )}
+            {stats?.fiftyTwoWeekLow && (
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>52 Week Low</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>${formatNumber(stats.fiftyTwoWeekLow)}</Text>
+              </View>
+            )}
+            {stats?.averageVolume && (
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Avg Volume</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>{formatLargeNumber(stats.averageVolume)}</Text>
+              </View>
+            )}
+            {stats?.sharesOutstanding && (
+              <View className="flex-row justify-between py-2">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Shares Outstanding</Text>
+                <Text style={{ fontFamily: "RubikMedium" }}>{formatLargeNumber(stats.sharesOutstanding)}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Financial Performance */}
+        {finData && (finData.totalRevenue || finData.grossProfits || finData.ebitda) && (
+          <View className="mb-4">
+            <Text className="text-white text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
+              💰 Financial Performance
+            </Text>
+            <View className="bg-white rounded-xl p-4">
+              {finData.totalRevenue && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Total Revenue</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>{formatLargeNumber(finData.totalRevenue)}</Text>
+                </View>
+              )}
+              {finData.grossProfits && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Gross Profit</Text>
+                  <Text className="text-green-600" style={{ fontFamily: "RubikBold" }}>
+                    {formatLargeNumber(finData.grossProfits)}
+                  </Text>
+                </View>
+              )}
+              {finData.ebitda && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>EBITDA</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>{formatLargeNumber(finData.ebitda)}</Text>
+                </View>
+              )}
+              {finData.profitMargins && (
+                <View className="flex-row justify-between py-2">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Profit Margin</Text>
+                  <Text className="text-green-600" style={{ fontFamily: "RubikBold" }}>
+                    {formatPercentage(finData.profitMargins)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Cash Flow */}
+        {finData && (finData.operatingCashflow || finData.freeCashflow) && (
+          <View className="mb-4">
+            <Text className="text-white text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
+              💵 Cash Flow
+            </Text>
+            <View className="bg-white rounded-xl p-4">
+              {finData.totalCash && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Total Cash</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>{formatLargeNumber(finData.totalCash)}</Text>
+                </View>
+              )}
+              {finData.operatingCashflow && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Operating Cash Flow</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>{formatLargeNumber(finData.operatingCashflow)}</Text>
+                </View>
+              )}
+              {finData.freeCashflow && (
+                <View className="flex-row justify-between py-2">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Free Cash Flow</Text>
+                  <Text className="text-green-600" style={{ fontFamily: "RubikBold" }}>
+                    {formatLargeNumber(finData.freeCashflow)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Financial Ratios */}
+        {finData && (finData.currentRatio || finData.debtToEquity || finData.returnOnEquity) && (
+          <View className="mb-4">
+            <Text className="text-white text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
+              🔢 Financial Ratios
+            </Text>
+            <View className="bg-white rounded-xl p-4">
+              {finData.currentRatio && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Current Ratio</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>{formatNumber(finData.currentRatio)}</Text>
+                </View>
+              )}
+              {finData.debtToEquity !== undefined && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Debt-to-Equity</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>{formatNumber(finData.debtToEquity)}</Text>
+                </View>
+              )}
+              {finData.returnOnAssets && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Return on Assets (ROA)</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>{formatPercentage(finData.returnOnAssets)}</Text>
+                </View>
+              )}
+              {finData.returnOnEquity && (
+                <View className="flex-row justify-between py-2">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Return on Equity (ROE)</Text>
+                  <Text className="text-green-600" style={{ fontFamily: "RubikBold" }}>
+                    {formatPercentage(finData.returnOnEquity)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Growth Metrics */}
+        {finData && (finData.revenueGrowth || finData.earningsGrowth) && (
+          <View className="mb-4">
+            <Text className="text-white text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
+              🚀 Growth Metrics
+            </Text>
+            <View className="bg-white rounded-xl p-4">
+              {finData.revenueGrowth !== undefined && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Revenue Growth (YoY)</Text>
+                  <Text 
+                    className={finData.revenueGrowth > 0 ? "text-green-600" : "text-red-600"}
+                    style={{ fontFamily: "RubikBold" }}
+                  >
+                    {formatPercentage(finData.revenueGrowth)}
+                  </Text>
+                </View>
+              )}
+              {finData.earningsGrowth !== undefined && (
+                <View className="flex-row justify-between py-2">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Earnings Growth (YoY)</Text>
+                  <Text 
+                    className={finData.earningsGrowth > 0 ? "text-green-600" : "text-red-600"}
+                    style={{ fontFamily: "RubikBold" }}
+                  >
+                    {formatPercentage(finData.earningsGrowth)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Analyst Price Targets */}
+        {finData && finData.targetMeanPrice && (
+          <View className="mb-6">
+            <Text className="text-white text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
+              🎯 Analyst Price Targets
+            </Text>
+            <View className="bg-white rounded-xl p-4">
+              <View className="flex-row justify-between py-2 border-b border-gray-100">
+                <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Target Price</Text>
+                <Text className="text-blue-600" style={{ fontFamily: "RubikBold" }}>
+                  ${formatNumber(finData.targetMeanPrice)}
+                </Text>
+              </View>
+              {finData.targetHighPrice && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>High Target</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>${formatNumber(finData.targetHighPrice)}</Text>
+                </View>
+              )}
+              {finData.targetLowPrice && (
+                <View className="flex-row justify-between py-2">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Low Target</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>${formatNumber(finData.targetLowPrice)}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Dividend Info */}
+        {stats && (stats.dividendYield || stats.dividendRate) && (
+          <View className="mb-6">
+            <Text className="text-white text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
+              💎 Dividend Information
+            </Text>
+            <View className="bg-white rounded-xl p-4">
+              {stats.dividendRate && (
+                <View className="flex-row justify-between py-2 border-b border-gray-100">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Dividend Rate</Text>
+                  <Text style={{ fontFamily: "RubikMedium" }}>${formatNumber(stats.dividendRate)}</Text>
+                </View>
+              )}
+              {stats.dividendYield && (
+                <View className="flex-row justify-between py-2">
+                  <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Dividend Yield</Text>
+                  <Text className="text-green-600" style={{ fontFamily: "RubikBold" }}>
+                    {formatPercentage(stats.dividendYield)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+      </ScrollView>
     );
   };
 
@@ -335,7 +659,6 @@ const StockDetailsScreen = () => {
   const currentPrice = quoteData?.body?.[0]?.regularMarketPrice || 0;
   const maxShares = currentPrice > 0 ? Math.floor(virtualCash / currentPrice) : 0;
 
-  // Show loading state
   if (isQuoteLoading || isHistoryLoading) {
     return (
       <LinearGradient colors={["#00194b", "#0C0C0C"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} className="flex-1">
@@ -364,7 +687,6 @@ const StockDetailsScreen = () => {
         </View>
 
         <View className="h-full px-4">
-          {/* ✅ UPDATED: Price Display Section with Real-time Data */}
           <View className="flex-row items-center justify-between py-4">
             <View className="flex-1 mr-4">
               <Text className="text-2xl text-white" style={{ fontFamily: "RubikBold" }}>
@@ -378,23 +700,18 @@ const StockDetailsScreen = () => {
             </View>
             
             <View>
-              {/* Price - Auto-selects best data source (Real-time > Chart > Quote) */}
               <Text className="text-2xl font-bold text-white text-right">
                 ${(() => {
-                  // Priority 1: Real-time data (if available)
-                  if (liveData?.price) return liveData.price.toFixed(2);
-                  
-                  // Priority 2: Chart data
+                  if (liveData?.price && liveData.price > 0) return liveData.price.toFixed(2);
                   if (processedChartData.length > 0) {
-                    return processedChartData[processedChartData.length - 1]?.value.toFixed(2);
+                    const lastPrice = processedChartData[processedChartData.length - 1]?.value;
+                    if (lastPrice && lastPrice > 0) return lastPrice.toFixed(2);
                   }
-                  
-                  // Priority 3: Quote data
-                  return (quoteData?.body?.[0]?.regularMarketPrice || 0).toFixed(2);
+                  const quotePrice = quoteData?.body?.[0]?.regularMarketPrice;
+                  return (quotePrice && quotePrice > 0) ? quotePrice.toFixed(2) : '0.00';
                 })()}
               </Text>
               
-              {/* Change & Percent Change - Auto-selects best data source */}
               <View className="flex-row items-center mt-1 justify-end">
                 <Text
                   className={`text-base ${(() => {
@@ -423,7 +740,6 @@ const StockDetailsScreen = () => {
         </View>
       </LinearGradient>
 
-      {/* Buy Modal */}
       <Modal visible={showBuyModal} transparent animationType="slide">
         <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View className="bg-white rounded-t-3xl p-6">
@@ -462,7 +778,6 @@ const StockDetailsScreen = () => {
         </View>
       </Modal>
 
-      {/* Floating Buttons */}
       <View 
         className="absolute bottom-0 left-0 right-0 pb-6 pt-4 px-5"
         style={{ backgroundColor: '#00194b', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}

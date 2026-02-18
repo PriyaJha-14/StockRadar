@@ -23,7 +23,6 @@ import {
   View,
 } from "react-native";
 import Svg, { Line, Rect } from 'react-native-svg';
-import { LineChart } from 'react-native-wagmi-charts';
 import { blurhash } from "../../app/index";
 import {
   calculateHealthScore,
@@ -38,6 +37,9 @@ import { fetchCompanyNews, NewsArticle } from "../api/newsApi";
 import { useChatStore } from "../store/chatStore";
 import { usePortfolioStore } from "../store/portfolioStore";
 import { useWatchlistStore } from "../store/watchlistStore";
+
+// Import currency detection
+import { detectCurrency, getCurrencySymbol } from "@/utils/currencyHelper";
 
 const timeFrames = [
   { label: "1D", interval: "5m", days: 1 },
@@ -74,13 +76,16 @@ const StockDetailsScreen = () => {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [buyQuantity, setBuyQuantity] = useState("");
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
-  const [chartType, setChartType] = useState<'line' | 'candle'>('line');
 
   const { setContext } = useChatStore();
   const { buyStock, virtualCash } = usePortfolioStore();
   const { stocks, addStock, removeStock, isInWatchlist } = useWatchlistStore();
 
   const { liveData, loading: liveLoading } = useRealtimePrice(symbol);
+
+  // Detect currency
+  const currency = useMemo(() => detectCurrency(symbol), [symbol]);
+  const currencySymbol = useMemo(() => getCurrencySymbol(currency), [currency]);
 
   const isWatched = useMemo(() => {
     return isInWatchlist(symbol);
@@ -124,7 +129,7 @@ const StockDetailsScreen = () => {
 
   const processedChartData = useMemo(() => {
     if (!historyData?.body) return [];
-    
+
     try {
       return Object.entries(historyData.body).map(([timestamp, data]: [string, any]) => ({
         timestamp: parseInt(timestamp),
@@ -150,14 +155,14 @@ const StockDetailsScreen = () => {
     try {
       const firstPrice = processedChartData[0]?.value || 0;
       const lastPrice = processedChartData[processedChartData.length - 1]?.value || 0;
-      
+
       if (firstPrice === 0) {
         return { change: 0, percentChange: 0, isPositive: false };
       }
 
       const change = lastPrice - firstPrice;
       const percentChange = (change / firstPrice) * 100;
-      
+
       return { 
         change: isNaN(change) ? 0 : change, 
         percentChange: isNaN(percentChange) ? 0 : percentChange, 
@@ -200,7 +205,7 @@ const StockDetailsScreen = () => {
       const maxShares = Math.floor(virtualCash / currentPrice);
       Alert.alert(
         "Insufficient Funds",
-        `You need $${totalCost.toFixed(2)} but only have $${virtualCash.toFixed(2)}\n\nMaximum shares: ${maxShares}`
+        `You need ${currencySymbol}${totalCost.toFixed(2)} but only have ${currencySymbol}${virtualCash.toFixed(2)}\n\nMaximum shares: ${maxShares}`
       );
       return;
     }
@@ -211,7 +216,7 @@ const StockDetailsScreen = () => {
       setShowBuyModal(false);
       Alert.alert(
         "Success! 🎉",
-        `Bought ${quantity} share${quantity > 1 ? 's' : ''} of ${symbol} for $${totalCost.toFixed(2)}\n\nRemaining Cash: $${(virtualCash - totalCost).toFixed(2)}\n\nCheck your Portfolio tab!`
+        `Bought ${quantity} share${quantity > 1 ? 's' : ''} of ${symbol} for ${currencySymbol}${totalCost.toFixed(2)}\n\nRemaining Cash: ${currencySymbol}${(virtualCash - totalCost).toFixed(2)}\n\nCheck your Portfolio tab!`
       );
     } else {
       Alert.alert("Error", "Failed to purchase stock");
@@ -223,7 +228,7 @@ const StockDetailsScreen = () => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
+
     if (diffHours < 1) return 'Just now';
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffHours < 48) return 'Yesterday';
@@ -234,17 +239,12 @@ const StockDetailsScreen = () => {
     return GRADIENT_COLORS[index % GRADIENT_COLORS.length];
   };
 
-  const handleChartTypeToggle = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setChartType(prev => prev === 'line' ? 'candle' : 'line');
-  };
-
   const handleTimeframeSelect = (index: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedTimeFrame(index);
   };
 
-  // Chart Component with Custom SVG Candlesticks
+  // CANDLESTICK ONLY Chart - NO LINE GRAPH
   const renderChart = () => {
     if (!processedChartData || processedChartData.length === 0) {
       return (
@@ -269,14 +269,9 @@ const StockDetailsScreen = () => {
     const percentChange = liveData?.percentChange ?? priceChangeData.percentChange;
     const isPositive = priceChange >= 0;
     const lineColor = isPositive ? '#22c55e' : '#ef4444';
-    const gradientColors = isPositive 
-      ? ['rgba(34, 197, 94, 0.4)', 'rgba(34, 197, 94, 0.0)'] 
-      : ['rgba(239, 68, 68, 0.4)', 'rgba(239, 68, 68, 0.0)'];
 
-    // Prepare candlestick data (limit to reasonable number for visibility)
     const candleDataForChart = processedChartData.slice(-30);
-    
-    // Calculate price range for scaling
+
     const allPrices = candleDataForChart.flatMap(d => [d.high, d.low]).filter(p => p > 0);
     if (allPrices.length === 0) {
       return (
@@ -286,7 +281,7 @@ const StockDetailsScreen = () => {
         </View>
       );
     }
-    
+
     const minPrice = Math.min(...allPrices);
     const maxPrice = Math.max(...allPrices);
     const priceRange = maxPrice - minPrice || 1;
@@ -297,7 +292,7 @@ const StockDetailsScreen = () => {
         {/* Chart Header */}
         <View style={chartStyles.header}>
           <View>
-            <Text style={chartStyles.price}>${currentPrice.toFixed(2)}</Text>
+            <Text style={chartStyles.price}>{currencySymbol}{currentPrice.toFixed(2)}</Text>
             <View style={chartStyles.changeContainer}>
               <Ionicons 
                 name={isPositive ? "arrow-up" : "arrow-down"} 
@@ -305,171 +300,227 @@ const StockDetailsScreen = () => {
                 color={lineColor} 
               />
               <Text style={[chartStyles.change, { color: lineColor }]}>
-                ${Math.abs(priceChange).toFixed(2)} ({Math.abs(percentChange).toFixed(2)}%)
+                {currencySymbol}{Math.abs(priceChange).toFixed(2)} ({Math.abs(percentChange).toFixed(2)}%)
               </Text>
+              <View style={{
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 4,
+                marginLeft: 8,
+              }}>
+                <Text style={{
+                  fontSize: 10,
+                  color: '#3b82f6',
+                  fontFamily: 'RubikBold',
+                }}>
+                  {currency}
+                </Text>
+              </View>
             </View>
           </View>
 
-          {/* Chart Type Toggle */}
-          <View style={chartStyles.controls}>
-            <Pressable 
-              style={[chartStyles.controlButton, chartType === 'line' && chartStyles.controlButtonActive]}
-              onPress={handleChartTypeToggle}
-            >
-              <Ionicons name="trending-up" size={18} color={chartType === 'line' ? '#fff' : '#64748b'} />
-              <Text style={[chartStyles.controlText, chartType === 'line' && chartStyles.controlTextActive]}>
-                Line
-              </Text>
-            </Pressable>
-            
-            <Pressable 
-              style={[chartStyles.controlButton, chartType === 'candle' && chartStyles.controlButtonActive]}
-              onPress={handleChartTypeToggle}
-            >
-              <Ionicons name="bar-chart" size={18} color={chartType === 'candle' ? '#fff' : '#64748b'} />
-              <Text style={[chartStyles.controlText, chartType === 'candle' && chartStyles.controlTextActive]}>
-                Candle
-              </Text>
-            </Pressable>
+          {/* Candlestick Label */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#3b82f6',
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 8,
+            gap: 4,
+            shadowColor: '#3b82f6',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 4,
+            elevation: 3,
+          }}>
+            <Ionicons name="bar-chart" size={18} color="#fff" />
+            <Text style={{
+              fontSize: 12,
+              fontWeight: '600',
+              color: '#ffffff',
+              fontFamily: 'RubikMedium',
+            }}>
+              Candle
+            </Text>
           </View>
         </View>
 
-        {/* Chart Area */}
+        {/* Candlestick Chart */}
         <View style={chartStyles.chartContainer}>
-          {chartType === 'line' ? (
-            <LineChart.Provider data={processedChartData}>
-              <LineChart width={CHART_WIDTH} height={CHART_HEIGHT}>
-                <LineChart.Path color={lineColor} width={2.5}>
-                  <LineChart.Gradient color={lineColor}>
-                    <LinearGradient
-                      colors={gradientColors}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 0, y: 1 }}
+          <View style={{ 
+            backgroundColor: '#f8fafc', 
+            borderRadius: 12, 
+            padding: 12,
+            borderWidth: 1,
+            borderColor: '#e2e8f0',
+          }}>
+            <Svg width={CHART_WIDTH - 24} height={CHART_HEIGHT - 80}>
+              {/* Grid lines */}
+              {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => (
+                <Line
+                  key={`grid-${idx}`}
+                  x1={10}
+                  y1={(CHART_HEIGHT - 120) * ratio + 10}
+                  x2={CHART_WIDTH - 34}
+                  y2={(CHART_HEIGHT - 120) * ratio + 10}
+                  stroke="#e2e8f0"
+                  strokeWidth={1}
+                  strokeDasharray="4,4"
+                />
+              ))}
+
+              {candleDataForChart.map((candle, index) => {
+                if (candle.open === 0 || candle.close === 0) return null;
+
+                const isPositiveCandle = candle.close >= candle.open;
+                const candleWidth = Math.max((CHART_WIDTH - 80) / candleDataForChart.length - 2, 6);
+                const spacing = (CHART_WIDTH - 80) / candleDataForChart.length;
+                const x = index * spacing + spacing / 2 + 10;
+
+                const chartHeightForCandles = CHART_HEIGHT - 120;
+                const scaleY = (price: number) => {
+                  const normalized = (price - (minPrice - padding)) / (priceRange + 2 * padding);
+                  return chartHeightForCandles - (normalized * chartHeightForCandles) + 10;
+                };
+
+                const highY = scaleY(candle.high);
+                const lowY = scaleY(candle.low);
+                const openY = scaleY(candle.open);
+                const closeY = scaleY(candle.close);
+
+                const bodyTop = Math.min(openY, closeY);
+                const bodyHeight = Math.max(Math.abs(closeY - openY), 2);
+
+                return (
+                  <React.Fragment key={index}>
+                    {/* Shadow wick */}
+                    <Line
+                      x1={x}
+                      y1={highY}
+                      x2={x}
+                      y2={lowY}
+                      stroke={isPositiveCandle ? '#86efac' : '#fca5a5'}
+                      strokeWidth={1}
+                      opacity={0.5}
                     />
-                  </LineChart.Gradient>
-                </LineChart.Path>
-                
-                <LineChart.CursorCrosshair color={lineColor}>
-                  <LineChart.Tooltip
-                    textStyle={chartStyles.tooltipText}
-                  />
-                </LineChart.CursorCrosshair>
-              </LineChart>
 
-              <View style={chartStyles.labels}>
-                <LineChart.PriceText 
-                  style={chartStyles.priceLabel}
-                  precision={2}
-                />
-                <LineChart.DatetimeText
-                  style={chartStyles.dateLabel}
-                  locale="en-US"
-                  options={{
-                    year: timeFrames[selectedTimeFrame].label === 'All' ? 'numeric' : undefined,
-                    month: 'short',
-                    day: 'numeric',
-                    hour: timeFrames[selectedTimeFrame].label === '1D' ? 'numeric' : undefined,
-                    minute: timeFrames[selectedTimeFrame].label === '1D' ? '2-digit' : undefined,
-                  }}
-                />
-              </View>
-            </LineChart.Provider>
-          ) : (
-            <View>
-              {/* Custom Candlestick Chart */}
-              <View style={{ backgroundColor: '#f8fafc', borderRadius: 12, padding: 12 }}>
-                <Svg width={CHART_WIDTH - 24} height={CHART_HEIGHT - 80}>
-                  {candleDataForChart.map((candle, index) => {
-                    if (candle.open === 0 || candle.close === 0) return null;
-                    
-                    const isPositiveCandle = candle.close >= candle.open;
-                    const candleWidth = Math.max((CHART_WIDTH - 80) / candleDataForChart.length, 6);
-                    const spacing = (CHART_WIDTH - 80) / candleDataForChart.length;
-                    const x = index * spacing + spacing / 2 + 10;
-                    
-                    // Scale prices to fit chart height
-                    const chartHeightForCandles = CHART_HEIGHT - 120;
-                    const scaleY = (price: number) => {
-                      const normalized = (price - (minPrice - padding)) / (priceRange + 2 * padding);
-                      return chartHeightForCandles - (normalized * chartHeightForCandles) + 10;
-                    };
-                    
-                    const highY = scaleY(candle.high);
-                    const lowY = scaleY(candle.low);
-                    const openY = scaleY(candle.open);
-                    const closeY = scaleY(candle.close);
-                    
-                    const bodyTop = Math.min(openY, closeY);
-                    const bodyHeight = Math.max(Math.abs(closeY - openY), 2);
-                    
-                    return (
-                      <React.Fragment key={index}>
-                        {/* Wick (high-low line) */}
-                        <Line
-                          x1={x}
-                          y1={highY}
-                          x2={x}
-                          y2={lowY}
-                          stroke={isPositiveCandle ? '#22c55e' : '#ef4444'}
-                          strokeWidth={2}
-                        />
-                        
-                        {/* Body (open-close rectangle) */}
-                        <Rect
-                          x={x - candleWidth / 2}
-                          y={bodyTop}
-                          width={candleWidth}
-                          height={bodyHeight}
-                          fill={isPositiveCandle ? '#22c55e' : '#ef4444'}
-                          opacity={0.9}
-                        />
-                      </React.Fragment>
-                    );
-                  })}
-                </Svg>
-                
-                {/* Price labels */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingHorizontal: 12 }}>
-                  <Text style={{ fontSize: 11, color: '#64748b', fontFamily: 'RubikMedium' }}>
-                    Low: ${minPrice.toFixed(2)}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: '#64748b', fontFamily: 'RubikMedium' }}>
-                    High: ${maxPrice.toFixed(2)}
-                  </Text>
-                </View>
+                    {/* Main wick */}
+                    <Line
+                      x1={x}
+                      y1={highY}
+                      x2={x}
+                      y2={lowY}
+                      stroke={isPositiveCandle ? '#22c55e' : '#ef4444'}
+                      strokeWidth={2}
+                    />
+
+                    {/* Candle body */}
+                    <Rect
+                      x={x - candleWidth / 2}
+                      y={bodyTop}
+                      width={candleWidth}
+                      height={bodyHeight}
+                      fill={isPositiveCandle ? '#22c55e' : '#ef4444'}
+                      rx={2}
+                      ry={2}
+                    />
+
+                    {/* Highlight */}
+                    <Rect
+                      x={x - candleWidth / 2}
+                      y={bodyTop}
+                      width={candleWidth}
+                      height={bodyHeight / 3}
+                      fill="white"
+                      opacity={0.2}
+                      rx={2}
+                      ry={2}
+                    />
+                  </React.Fragment>
+                );
+              })}
+            </Svg>
+
+            {/* High/Low Labels */}
+            <View style={{ 
+              flexDirection: 'row', 
+              justifyContent: 'space-between', 
+              marginTop: 8, 
+              paddingHorizontal: 12,
+              borderTopWidth: 1,
+              borderTopColor: '#e2e8f0',
+              paddingTop: 8,
+            }}>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ 
+                  fontSize: 10, 
+                  color: '#ef4444', 
+                  fontFamily: 'RubikBold',
+                  marginBottom: 2,
+                }}>
+                  Low
+                </Text>
+                <Text style={{ 
+                  fontSize: 11, 
+                  color: '#64748b', 
+                  fontFamily: 'RubikMedium' 
+                }}>
+                  {currencySymbol}{minPrice.toFixed(2)}
+                </Text>
               </View>
 
-              <View style={chartStyles.ohlcContainer}>
-                <View style={chartStyles.ohlcRow}>
-                  <Text style={chartStyles.ohlcLabel}>O: </Text>
-                  <Text style={chartStyles.ohlcValue}>
-                    ${processedChartData[processedChartData.length - 1]?.open.toFixed(2)}
-                  </Text>
-                </View>
-                <View style={chartStyles.ohlcRow}>
-                  <Text style={chartStyles.ohlcLabel}>H: </Text>
-                  <Text style={[chartStyles.ohlcValue, { color: '#22c55e' }]}>
-                    ${processedChartData[processedChartData.length - 1]?.high.toFixed(2)}
-                  </Text>
-                </View>
-                <View style={chartStyles.ohlcRow}>
-                  <Text style={chartStyles.ohlcLabel}>L: </Text>
-                  <Text style={[chartStyles.ohlcValue, { color: '#ef4444' }]}>
-                    ${processedChartData[processedChartData.length - 1]?.low.toFixed(2)}
-                  </Text>
-                </View>
-                <View style={chartStyles.ohlcRow}>
-                  <Text style={chartStyles.ohlcLabel}>C: </Text>
-                  <Text style={chartStyles.ohlcValue}>
-                    ${processedChartData[processedChartData.length - 1]?.close.toFixed(2)}
-                  </Text>
-                </View>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ 
+                  fontSize: 10, 
+                  color: '#22c55e', 
+                  fontFamily: 'RubikBold',
+                  marginBottom: 2,
+                }}>
+                  High
+                </Text>
+                <Text style={{ 
+                  fontSize: 11, 
+                  color: '#64748b', 
+                  fontFamily: 'RubikMedium' 
+                }}>
+                  {currencySymbol}{maxPrice.toFixed(2)}
+                </Text>
               </View>
             </View>
-          )}
+          </View>
+
+          {/* OHLC Data */}
+          <View style={chartStyles.ohlcContainer}>
+            <View style={chartStyles.ohlcRow}>
+              <Text style={chartStyles.ohlcLabel}>Open</Text>
+              <Text style={chartStyles.ohlcValue}>
+                {currencySymbol}{processedChartData[processedChartData.length - 1]?.open.toFixed(2)}
+              </Text>
+            </View>
+            <View style={chartStyles.ohlcRow}>
+              <Text style={chartStyles.ohlcLabel}>High</Text>
+              <Text style={[chartStyles.ohlcValue, { color: '#22c55e' }]}>
+                {currencySymbol}{processedChartData[processedChartData.length - 1]?.high.toFixed(2)}
+              </Text>
+            </View>
+            <View style={chartStyles.ohlcRow}>
+              <Text style={chartStyles.ohlcLabel}>Low</Text>
+              <Text style={[chartStyles.ohlcValue, { color: '#ef4444' }]}>
+                {currencySymbol}{processedChartData[processedChartData.length - 1]?.low.toFixed(2)}
+              </Text>
+            </View>
+            <View style={chartStyles.ohlcRow}>
+              <Text style={chartStyles.ohlcLabel}>Close</Text>
+              <Text style={chartStyles.ohlcValue}>
+                {currencySymbol}{processedChartData[processedChartData.length - 1]?.close.toFixed(2)}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Chart Info */}
+        {/* Chart Info Bar */}
         <View style={chartStyles.infoBar}>
           <View style={chartStyles.infoItem}>
             <Ionicons name="time-outline" size={14} color="#64748b" />
@@ -488,7 +539,6 @@ const StockDetailsScreen = () => {
     );
   };
 
-  // Timeframe Selector
   const renderTimeframeSelector = () => {
     return (
       <View style={timeframeStyles.container}>
@@ -584,7 +634,7 @@ const StockDetailsScreen = () => {
             </View>
           </LinearGradient>
         )}
-        
+
         <View className="p-4">
           <View className="flex-row items-center mb-3">
             <View className="bg-blue-100 px-3 py-1.5 rounded-full">
@@ -597,7 +647,7 @@ const StockDetailsScreen = () => {
               {formatNewsDate(item.datetime)}
             </Text>
           </View>
-          
+
           <Text 
             className="text-gray-900 text-base mb-2" 
             style={{ fontFamily: "RubikBold", lineHeight: 22 }}
@@ -605,7 +655,7 @@ const StockDetailsScreen = () => {
           >
             {item.headline}
           </Text>
-          
+
           {item.summary && item.summary.length > 0 && (
             <Text 
               className="text-gray-600 text-sm mb-3" 
@@ -782,7 +832,7 @@ const StockDetailsScreen = () => {
           <Text className="text-gray-900 text-lg mb-3" style={{ fontFamily: "RubikBold" }}>
             {healthInfo.emoji} Financial Health Score
           </Text>
-          
+
           <View className="flex-row items-center mb-2">
             <View className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden mr-3">
               <View 
@@ -797,7 +847,7 @@ const StockDetailsScreen = () => {
               {healthScore}
             </Text>
           </View>
-          
+
           <Text className="text-gray-700" style={{ fontFamily: "RubikMedium" }}>
             {healthInfo.label} - {
               healthScore >= 80 ? "Strong fundamentals with healthy financials" :
@@ -1109,7 +1159,6 @@ const StockDetailsScreen = () => {
       <StatusBar barStyle="light-content" />
 
       <LinearGradient colors={["#00194b", "#0C0C0C"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} className="flex-1">
-        {/* Header - Fixed at top */}
         <View className="pt-16 px-4 flex-row justify-between items-center">
           <Pressable className="mx-2 bg-white rounded-full p-1" onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#0284c7" />
@@ -1119,14 +1168,12 @@ const StockDetailsScreen = () => {
           </Pressable>
         </View>
 
-        {/* Main Scrollable Content */}
         <ScrollView 
           className="flex-1"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 200 }}
         >
           <View className="px-4">
-            {/* Stock Price Header */}
             <View className="flex-row items-center justify-between py-4">
               <View className="flex-1 mr-4">
                 <Text className="text-2xl text-white" style={{ fontFamily: "RubikBold" }}>
@@ -1138,20 +1185,30 @@ const StockDetailsScreen = () => {
                   </Text>
                 )}
               </View>
-              
+
               <View>
-                <Text className="text-2xl font-bold text-white text-right">
-                  ${(() => {
-                    if (liveData?.price && liveData.price > 0) return liveData.price.toFixed(2);
-                    if (processedChartData.length > 0) {
-                      const lastPrice = processedChartData[processedChartData.length - 1]?.value;
-                      if (lastPrice && lastPrice > 0) return lastPrice.toFixed(2);
-                    }
-                    const quotePrice = quoteData?.body?.[0]?.regularMarketPrice;
-                    return (quotePrice && quotePrice > 0) ? quotePrice.toFixed(2) : '0.00';
-                  })()}
-                </Text>
-                
+                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                  <Text className="text-2xl font-bold text-white text-right">
+                    {currencySymbol}{(() => {
+                      if (liveData?.price && liveData.price > 0) return liveData.price.toFixed(2);
+                      if (processedChartData.length > 0) {
+                        const lastPrice = processedChartData[processedChartData.length - 1]?.value;
+                        if (lastPrice && lastPrice > 0) return lastPrice.toFixed(2);
+                      }
+                      const quotePrice = quoteData?.body?.[0]?.regularMarketPrice;
+                      return (quotePrice && quotePrice > 0) ? quotePrice.toFixed(2) : '0.00';
+                    })()}
+                  </Text>
+                  <Text style={{
+                    fontSize: 10,
+                    color: '#9ca3af',
+                    marginLeft: 4,
+                    fontFamily: 'RubikMedium',
+                  }}>
+                    {currency}
+                  </Text>
+                </View>
+
                 <View className="flex-row items-center mt-1 justify-end">
                   <Text
                     className={`text-base ${(() => {
@@ -1164,25 +1221,19 @@ const StockDetailsScreen = () => {
                       const change = liveData?.change ?? priceChangeData.change;
                       const percentChange = liveData?.percentChange ?? priceChangeData.percentChange;
                       const isPositive = change >= 0;
-                      
-                      return `${isPositive ? "+" : ""}${change.toFixed(2)} (${isPositive ? "+" : ""}${percentChange.toFixed(2)}%)`;
+
+                      return `${isPositive ? "+" : ""}${currencySymbol}${Math.abs(change).toFixed(2)} (${isPositive ? "+" : ""}${percentChange.toFixed(2)}%)`;
                     })()}
                   </Text>
                 </View>
               </View>
             </View>
 
-            {/* Timeframe Selector */}
             {renderTimeframeSelector()}
-            
-            {/* Stock Chart */}
             {renderChart()}
-
-            {/* Tab Bar */}
             {renderTabBar()}
           </View>
 
-          {/* Tab Content */}
           <View className="px-4">
             {activeTab === 0 && renderOverview()}
             {activeTab === 1 && renderFinancialsTab()}
@@ -1228,16 +1279,15 @@ const StockDetailsScreen = () => {
         </ScrollView>
       </LinearGradient>
 
-      {/* Buy Modal */}
       <Modal visible={showBuyModal} transparent animationType="slide">
         <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View className="bg-white rounded-t-3xl p-6">
             <Text className="text-2xl mb-2" style={{ fontFamily: "RubikBold" }}>Buy {symbol}</Text>
             <Text className="text-gray-600 mb-4" style={{ fontFamily: "RubikMedium" }}>
-              Current Price: ${currentPrice.toFixed(2)}
+              Current Price: {currencySymbol}{currentPrice.toFixed(2)}
             </Text>
             <Text className="text-gray-600 mb-4" style={{ fontFamily: "RubikMedium" }}>
-              Available Cash: ${virtualCash.toFixed(2)}
+              Available Cash: {currencySymbol}{virtualCash.toFixed(2)}
             </Text>
             <Text className="text-gray-500 text-sm mb-4" style={{ fontFamily: "RubikRegular" }}>
               Maximum shares you can buy: {maxShares}
@@ -1267,7 +1317,6 @@ const StockDetailsScreen = () => {
         </View>
       </Modal>
 
-      {/* Bottom Action Buttons - Fixed at bottom */}
       <View 
         className="absolute bottom-0 left-0 right-0 pb-6 pt-4 px-5"
         style={{ backgroundColor: '#00194b', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}
@@ -1301,7 +1350,6 @@ const StockDetailsScreen = () => {
   );
 };
 
-// Chart Styles
 const chartStyles = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
@@ -1309,10 +1357,12 @@ const chartStyles = StyleSheet.create({
     padding: 16,
     marginVertical: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   header: {
     flexDirection: 'row',
@@ -1337,74 +1387,31 @@ const chartStyles = StyleSheet.create({
     marginLeft: 4,
     fontFamily: 'RubikMedium',
   },
-  controls: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  controlButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-    gap: 4,
-  },
-  controlButtonActive: {
-    backgroundColor: '#3b82f6',
-  },
-  controlText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-    fontFamily: 'RubikMedium',
-  },
-  controlTextActive: {
-    color: '#ffffff',
-  },
   chartContainer: {
     marginVertical: 8,
-  },
-  labels: {
-    marginTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0f172a',
-    fontFamily: 'RubikBold',
-  },
-  dateLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    fontFamily: 'RubikRegular',
-  },
-  tooltipText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'RubikMedium',
   },
   ohlcContainer: {
     marginTop: 12,
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 8,
+    paddingVertical: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   ohlcRow: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
   ohlcLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748b',
     fontFamily: 'RubikMedium',
+    marginBottom: 4,
   },
   ohlcValue: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#0f172a',
     fontFamily: 'RubikBold',
@@ -1436,9 +1443,11 @@ const chartStyles = StyleSheet.create({
     height: 280,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fafc',
     borderRadius: 16,
     marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   emptyText: {
     marginTop: 12,
@@ -1448,7 +1457,6 @@ const chartStyles = StyleSheet.create({
   },
 });
 
-// Timeframe Styles
 const timeframeStyles = StyleSheet.create({
   container: {
     paddingVertical: 8,

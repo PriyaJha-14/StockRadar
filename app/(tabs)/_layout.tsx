@@ -1,8 +1,50 @@
 // app/(tabs)/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useEffect } from 'react';
+import { useChatStore } from '../store/chatStore';
+import { usePortfolioStore } from '../store/portfolioStore';
+import { useSimpleAuthStore } from '../store/simpleAuthStore';
+import { useWatchlistStore } from '../store/watchlistStore';
 
 export default function TabLayout() {
+  const { loadUsers, currentUser } = useSimpleAuthStore();
+  
+  // ✅ Load users on app start
+  useEffect(() => {
+    console.log('🚀 App started, loading users...');
+    loadUsers();
+  }, []);
+  
+  // ✅ Load user-specific data when user logs in
+  useEffect(() => {
+    if (currentUser) {
+      console.log('👤 User logged in:', currentUser.email);
+      console.log('📂 Loading user data...');
+      
+      // Load portfolio data
+      const { holdings, virtualCash } = usePortfolioStore.getState();
+      usePortfolioStore.setState({
+        holdings: currentUser.portfolio || [],
+        virtualCash: currentUser.virtualCash || 100000,
+      });
+      
+      // Load watchlist data
+      useWatchlistStore.setState({
+        stocks: currentUser.watchlist || [],
+      });
+      
+      // Load chat history
+      useChatStore.setState({
+        messages: currentUser.chatHistory || [],
+      });
+      
+      console.log('✅ User data loaded successfully');
+    } else {
+      console.log('👤 No user logged in (Guest mode)');
+    }
+  }, [currentUser]);
+
   return (
     <Tabs
       screenOptions={{
@@ -60,6 +102,15 @@ export default function TabLayout() {
           title: "AI Chat",
           tabBarIcon: ({ color }) => (
             <Ionicons name="chatbubbles" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="settings" size={24} color={color} />
           ),
         }}
       />

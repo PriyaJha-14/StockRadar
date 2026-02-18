@@ -1,7 +1,10 @@
 // app/store/portfolioStore.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import { Alert } from "react-native";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { useSimpleAuthStore } from "./simpleAuthStore";
 
 export interface PortfolioHolding {
   id: string;
@@ -18,7 +21,7 @@ interface PortfolioStore {
   virtualCash: number;
   
   addHolding: (holding: Omit<PortfolioHolding, "id" | "buyDate">) => void;
-  buyStock: (symbol: string, quantity: number, price: number) => void; // ✅ FIXED: Proper declaration
+  buyStock: (symbol: string, quantity: number, price: number, companyName?: string) => boolean;
   removeHolding: (id: string) => void;
   updateHolding: (id: string, quantity: number) => void;
   sellHolding: (id: string, quantity: number, sellPrice: number) => void;
@@ -27,69 +30,134 @@ interface PortfolioStore {
   getTotalProfit: () => number;
   getPortfolioSummary: () => string;
   clearPortfolio: () => void;
+  loadUserPortfolio: () => void;
 }
+
+// Auth check helper
+const checkAuth = () => {
+  const { isAuthenticated } = useSimpleAuthStore.getState();
+  if (!isAuthenticated) {
+    Alert.alert(
+      '🔒 Sign In Required',
+      'You need to sign in to buy/sell stocks and save your portfolio',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign In', 
+          onPress: () => router.push('/auth/simple-signin') 
+        },
+      ]
+    );
+    return false;
+  }
+  return true;
+};
 
 export const usePortfolioStore = create<PortfolioStore>()(
   persist(
     (set, get) => ({
       holdings: [],
-      virtualCash: 100000, // Starting with $100,000 virtual cash
+      virtualCash: 100000,
 
-      // ✅ NEW: Simplified buyStock function
-      buyStock: (symbol, quantity, price) => {
+      buyStock: (symbol, quantity, price, companyName = symbol) => {
+        // ✅ Check authentication first
+        if (!checkAuth()) return false;
+
         const cost = quantity * price;
         const { virtualCash, holdings } = get();
 
         if (cost > virtualCash) {
-          console.warn("⚠️ Insufficient virtual cash");
+          Alert.alert(
+            '⚠️ Insufficient Funds',
+            `You need $${cost.toFixed(2)} but only have $${virtualCash.toFixed(2)}`
+          );
           return false;
         }
 
-        // Check if stock already exists in portfolio
         const existingHolding = holdings.find(h => h.symbol === symbol);
 
         if (existingHolding) {
-          // Update existing holding (average price)
           const totalQuantity = existingHolding.quantity + quantity;
           const totalCost = (existingHolding.buyPrice * existingHolding.quantity) + cost;
           const newAvgPrice = totalCost / totalQuantity;
 
+          const updatedHoldings = holdings.map(h =>
+            h.symbol === symbol
+              ? { ...h, quantity: totalQuantity, buyPrice: newAvgPrice }
+              : h
+          );
+
           set({
-            holdings: holdings.map(h =>
-              h.symbol === symbol
-                ? { ...h, quantity: totalQuantity, buyPrice: newAvgPrice }
-                : h
-            ),
+            holdings: updatedHoldings,
             virtualCash: virtualCash - cost,
           });
+
+          // ✅ Sync to user account
+          const { currentUser, updatePortfolio, updateVirtualCash, addTrade } = 
+            useSimpleAuthStore.getState();
+          
+          if (currentUser) {
+            updatePortfolio(updatedHoldings);
+            updateVirtualCash(virtualCash - cost);
+            addTrade({
+              type: 'BUY',
+              symbol,
+              quantity,
+              price,
+              timestamp: new Date().toISOString(),
+            });
+          }
         } else {
-          // Add new holding
           const newHolding: PortfolioHolding = {
             id: Date.now().toString(),
             symbol,
-            companyName: symbol, // Will be updated with full name later
+            companyName,
             quantity,
             buyPrice: price,
             buyDate: new Date(),
             currentPrice: price,
           };
 
+          const updatedHoldings = [...holdings, newHolding];
+
           set({
-            holdings: [...holdings, newHolding],
+            holdings: updatedHoldings,
             virtualCash: virtualCash - cost,
           });
+
+          // ✅ Sync to user account
+          const { currentUser, updatePortfolio, updateVirtualCash, addTrade } = 
+            useSimpleAuthStore.getState();
+          
+          if (currentUser) {
+            updatePortfolio(updatedHoldings);
+            updateVirtualCash(virtualCash - cost);
+            addTrade({
+              type: 'BUY',
+              symbol,
+              quantity,
+              price,
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
 
+        Alert.alert(
+          '✅ Purchase Successful',
+          `Bought ${quantity} shares of ${symbol} at $${price.toFixed(2)}`
+        );
         console.log("✅ Bought stock:", symbol, quantity, "@", price);
         return true;
       },
 
       addHolding: (holding) => {
+        if (!checkAuth()) return;
+
         const cost = holding.quantity * holding.buyPrice;
         const { virtualCash, holdings } = get();
 
         if (cost > virtualCash) {
-          console.warn("⚠️ Insufficient virtual cash");
+          Alert.alert('⚠️ Insufficient Funds');
           return;
         }
 
@@ -99,54 +167,102 @@ export const usePortfolioStore = create<PortfolioStore>()(
           buyDate: new Date(),
         };
 
+        const updatedHoldings = [...holdings, newHolding];
+
         set({
-          holdings: [...holdings, newHolding],
+          holdings: updatedHoldings,
           virtualCash: virtualCash - cost,
         });
+
+        // Sync to user account
+        const { currentUser, updatePortfolio, updateVirtualCash } = 
+          useSimpleAuthStore.getState();
+        
+        if (currentUser) {
+          updatePortfolio(updatedHoldings);
+          updateVirtualCash(virtualCash - cost);
+        }
 
         console.log("✅ Added holding:", newHolding.symbol);
       },
 
       removeHolding: (id) => {
-        set((state) => ({
-          holdings: state.holdings.filter((h) => h.id !== id),
-        }));
+        if (!checkAuth()) return;
+
+        const updatedHoldings = get().holdings.filter((h) => h.id !== id);
+        set({ holdings: updatedHoldings });
+
+        // Sync to user account
+        const { currentUser, updatePortfolio } = useSimpleAuthStore.getState();
+        if (currentUser) {
+          updatePortfolio(updatedHoldings);
+        }
       },
 
       updateHolding: (id, quantity) => {
-        set((state) => ({
-          holdings: state.holdings.map((h) =>
-            h.id === id ? { ...h, quantity } : h
-          ),
-        }));
+        if (!checkAuth()) return;
+
+        const updatedHoldings = get().holdings.map((h) =>
+          h.id === id ? { ...h, quantity } : h
+        );
+        
+        set({ holdings: updatedHoldings });
+
+        // Sync to user account
+        const { currentUser, updatePortfolio } = useSimpleAuthStore.getState();
+        if (currentUser) {
+          updatePortfolio(updatedHoldings);
+        }
       },
 
       sellHolding: (id, quantity, sellPrice) => {
+        if (!checkAuth()) return;
+
         const { holdings, virtualCash } = get();
         const holding = holdings.find((h) => h.id === id);
 
         if (!holding || holding.quantity < quantity) {
-          console.warn("⚠️ Insufficient quantity to sell");
+          Alert.alert('⚠️ Error', 'Insufficient quantity to sell');
           return;
         }
 
         const proceeds = quantity * sellPrice;
         const newQuantity = holding.quantity - quantity;
 
+        let updatedHoldings;
         if (newQuantity === 0) {
-          set({
-            holdings: holdings.filter((h) => h.id !== id),
-            virtualCash: virtualCash + proceeds,
-          });
+          updatedHoldings = holdings.filter((h) => h.id !== id);
         } else {
-          set({
-            holdings: holdings.map((h) =>
-              h.id === id ? { ...h, quantity: newQuantity } : h
-            ),
-            virtualCash: virtualCash + proceeds,
+          updatedHoldings = holdings.map((h) =>
+            h.id === id ? { ...h, quantity: newQuantity } : h
+          );
+        }
+
+        set({
+          holdings: updatedHoldings,
+          virtualCash: virtualCash + proceeds,
+        });
+
+        // Sync to user account
+        const { currentUser, updatePortfolio, updateVirtualCash, addTrade } = 
+          useSimpleAuthStore.getState();
+        
+        if (currentUser) {
+          updatePortfolio(updatedHoldings);
+          updateVirtualCash(virtualCash + proceeds);
+          addTrade({
+            type: 'SELL',
+            symbol: holding.symbol,
+            quantity,
+            price: sellPrice,
+            timestamp: new Date().toISOString(),
           });
         }
 
+        Alert.alert(
+          '✅ Sale Successful',
+          `Sold ${quantity} shares for $${proceeds.toFixed(2)}`
+        );
         console.log("✅ Sold", quantity, "shares for $", proceeds);
       },
 
@@ -216,6 +332,18 @@ export const usePortfolioStore = create<PortfolioStore>()(
           holdings: [],
           virtualCash: 100000,
         });
+      },
+
+      // ✅ Load user's portfolio data
+      loadUserPortfolio: () => {
+        const { currentUser } = useSimpleAuthStore.getState();
+        if (currentUser) {
+          set({
+            holdings: currentUser.portfolio || [],
+            virtualCash: currentUser.virtualCash || 100000,
+          });
+          console.log('📂 Loaded user portfolio');
+        }
       },
     }),
     {

@@ -1,18 +1,19 @@
+// app/(tabs)/settings.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Linking,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    View,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
 } from 'react-native';
 import { useSimpleAuthStore } from '../store/simpleAuthStore';
 
@@ -21,7 +22,6 @@ const SettingsScreen = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
-  // Load preferences on mount
   useEffect(() => {
     loadUsers();
     loadPreferences();
@@ -31,13 +31,8 @@ const SettingsScreen = () => {
     try {
       const notifications = await AsyncStorage.getItem('notifications_enabled');
       const darkMode = await AsyncStorage.getItem('dark_mode_enabled');
-      
-      if (notifications !== null) {
-        setNotificationsEnabled(JSON.parse(notifications));
-      }
-      if (darkMode !== null) {
-        setDarkModeEnabled(JSON.parse(darkMode));
-      }
+      if (notifications !== null) setNotificationsEnabled(JSON.parse(notifications));
+      if (darkMode !== null) setDarkModeEnabled(JSON.parse(darkMode));
     } catch (error) {
       console.error('Error loading preferences:', error);
     }
@@ -46,66 +41,55 @@ const SettingsScreen = () => {
   const handleNotificationToggle = async (value: boolean) => {
     setNotificationsEnabled(value);
     await AsyncStorage.setItem('notifications_enabled', JSON.stringify(value));
-    
     Alert.alert(
-      value ? 'Notifications Enabled ✅' : 'Notifications Disabled',
-      value 
-        ? 'You will receive price alerts and updates'
-        : 'You will not receive any notifications'
+      value ? 'Notifications Enabled 🔔' : 'Notifications Disabled 🔕',
+      value
+        ? 'You will receive price alerts and market updates.'
+        : 'You will not receive any notifications.'
     );
   };
 
   const handleDarkModeToggle = async (value: boolean) => {
     setDarkModeEnabled(value);
     await AsyncStorage.setItem('dark_mode_enabled', JSON.stringify(value));
-    
-    Alert.alert(
-      value ? 'Dark Mode Enabled 🌙' : 'Dark Mode Disabled',
-      value
-        ? 'Dark theme will be applied (feature coming soon)'
-        : 'Light theme is active'
-    );
+    // No Alert needed — UI instantly changes
   };
 
   const handleContactSupport = () => {
-    Alert.alert(
-      'Contact Support 📧',
-      'How would you like to contact us?',
-      [
-        {
-          text: 'Email',
-          onPress: () => Linking.openURL('mailto:support@stockradar.com?subject=Support Request&body=Hi StockRadar Team,\n\n'),
-        },
-        {
-          text: 'WhatsApp',
-          onPress: () => Linking.openURL('https://wa.me/919876543210?text=Hi, I need help with StockRadar'),
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+    Alert.alert('Contact Support 📧', 'How would you like to contact us?', [
+      {
+        text: 'Email',
+        onPress: () =>
+          Linking.openURL(
+            'mailto:support@stockradar.com?subject=Support Request&body=Hi StockRadar Team,\n\n'
+          ),
+      },
+      {
+        text: 'WhatsApp',
+        onPress: () =>
+          Linking.openURL(
+            'https://wa.me/919876543210?text=Hi, I need help with StockRadar'
+          ),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handlePrivacyPolicy = () => {
     Alert.alert(
       'Privacy Policy 🔒',
       'StockRadar Privacy Policy\n\n' +
-      '1. We collect minimal data\n' +
-      '2. Your portfolio data is stored locally\n' +
-      '3. We do not sell your data\n' +
-      '4. Email is only used for authentication\n\n' +
-      'Full policy available at:\nstockradar.com/privacy',
+        '1. We collect minimal data\n' +
+        '2. Your portfolio data is stored locally\n' +
+        '3. We do not sell your data\n' +
+        '4. Email is only used for authentication\n\n' +
+        'Full policy available at:\nstockradar.com/privacy',
       [
         {
           text: 'Open Website',
           onPress: () => Linking.openURL('https://stockradar.com/privacy'),
         },
-        {
-          text: 'Close',
-          style: 'cancel',
-        },
+        { text: 'Close', style: 'cancel' },
       ]
     );
   };
@@ -114,48 +98,34 @@ const SettingsScreen = () => {
     Alert.alert(
       'Terms of Service 📄',
       'StockRadar Terms of Service\n\n' +
-      '1. This is a paper trading simulator\n' +
-      '2. No real money is involved\n' +
-      '3. Market data is for educational purposes\n' +
-      '4. We are not financial advisors\n\n' +
-      'Full terms available at:\nstockradar.com/terms',
+        '1. This is a paper trading simulator\n' +
+        '2. No real money is involved\n' +
+        '3. Market data is for educational purposes\n' +
+        '4. We are not financial advisors\n\n' +
+        'Full terms available at:\nstockradar.com/terms',
       [
         {
           text: 'Open Website',
           onPress: () => Linking.openURL('https://stockradar.com/terms'),
         },
-        {
-          text: 'Close',
-          style: 'cancel',
-        },
+        { text: 'Close', style: 'cancel' },
       ]
     );
   };
 
   const handleRateApp = () => {
-    Alert.alert(
-      'Rate StockRadar ⭐',
-      'Enjoying StockRadar? Please rate us!',
-      [
-        {
-          text: '⭐⭐⭐⭐⭐ Love it!',
-          onPress: () => {
-            Alert.alert('Thank you! 🎉', 'Your feedback means a lot to us!');
-            // In real app: Linking.openURL('market://details?id=com.stockradar');
-          },
-        },
-        {
-          text: '⭐⭐⭐ Good',
-          onPress: () => {
-            Alert.alert('Thanks!', 'We\'ll keep improving!');
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+    Alert.alert('Rate StockRadar ⭐', 'Enjoying StockRadar? Please rate us!', [
+      {
+        text: '⭐⭐⭐⭐⭐ Love it!',
+        onPress: () =>
+          Alert.alert('Thank you! 🎉', 'Your feedback means a lot to us!'),
+      },
+      {
+        text: '⭐⭐⭐ Good',
+        onPress: () => Alert.alert('Thanks!', "We'll keep improving!"),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleShareApp = () => {
@@ -165,18 +135,17 @@ const SettingsScreen = () => {
       [
         {
           text: 'Share via WhatsApp',
-          onPress: () => Linking.openURL('https://wa.me/?text=Check out StockRadar - The best paper trading app! 📈'),
+          onPress: () =>
+            Linking.openURL(
+              'https://wa.me/?text=Check out StockRadar - The best paper trading app! 📈'
+            ),
         },
         {
           text: 'Copy Link',
-          onPress: () => {
-            Alert.alert('Link Copied! 📋', 'Share link copied to clipboard');
-          },
+          onPress: () =>
+            Alert.alert('Link Copied! 📋', 'Share link copied to clipboard'),
         },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
@@ -189,29 +158,39 @@ const SettingsScreen = () => {
         {
           text: 'Clear Cache',
           onPress: async () => {
-            // Clear specific cache items, not user data
             await AsyncStorage.removeItem('cache_stocks');
             await AsyncStorage.removeItem('cache_news');
             Alert.alert('Success!', 'Cache cleared successfully');
           },
           style: 'destructive',
         },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
 
+  // ✅ Dynamic gradient based on dark mode toggle
+  const gradientColors = darkModeEnabled
+    ? (['#0a0a0a', '#111827'] as const)
+    : (['#00194b', '#0C0C0C'] as const);
+
+  // ✅ Dynamic card background based on dark mode
+  const cardStyle = darkModeEnabled
+    ? { backgroundColor: '#1f2937' }
+    : { backgroundColor: 'white' };
+
+  const cardTextColor = darkModeEnabled ? '#f9fafb' : '#000000';
+  const cardSubTextColor = darkModeEnabled ? '#9ca3af' : '#666666';
+  const cardBorderColor = darkModeEnabled ? '#374151' : '#f3f4f6';
+
   return (
     <LinearGradient
-      colors={['#00194b', '#0C0C0C']}
+      colors={gradientColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.container}
     >
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -219,26 +198,76 @@ const SettingsScreen = () => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Settings</Text>
+          {/* Dark mode indicator badge */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: 4,
+            }}
+          >
+            <Ionicons
+              name={darkModeEnabled ? 'moon' : 'sunny'}
+              size={14}
+              color={darkModeEnabled ? '#a5b4fc' : '#fbbf24'}
+            />
+            <Text
+              style={{
+                color: darkModeEnabled ? '#a5b4fc' : '#fbbf24',
+                fontSize: 12,
+                fontFamily: 'RubikMedium',
+                marginLeft: 4,
+              }}
+            >
+              {darkModeEnabled ? 'Dark Mode On' : 'Light Mode'}
+            </Text>
+          </View>
         </View>
 
         {/* Account Security Section */}
         <View style={styles.section}>
           {currentUser ? (
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>🔐 Account Security</Text>
+            <View style={[styles.card, cardStyle]}>
+              <Text style={[styles.sectionTitle, { color: cardTextColor }]}>
+                🔐 Account Security
+              </Text>
 
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Email</Text>
-                <Text style={styles.infoValue} numberOfLines={1}>
+              <View
+                style={[
+                  styles.infoRow,
+                  { borderBottomColor: cardBorderColor },
+                ]}
+              >
+                <Text style={[styles.infoLabel, { color: cardTextColor }]}>
+                  Email
+                </Text>
+                <Text
+                  style={[styles.infoValue, { color: cardTextColor }]}
+                  numberOfLines={1}
+                >
                   {currentUser.email}
                 </Text>
               </View>
 
-              <View style={styles.twoFARow}>
+              <View
+                style={[
+                  styles.twoFARow,
+                  { borderBottomColor: cardBorderColor },
+                ]}
+              >
                 <View style={styles.flex1}>
-                  <Text style={styles.twoFATitle}>Email-Based 2FA</Text>
-                  <Text style={styles.twoFASubtitle}>
-                    {currentUser.is2FAEnabled ? 'Enabled ✅' : 'Protect your account'}
+                  <Text style={[styles.twoFATitle, { color: cardTextColor }]}>
+                    Email-Based 2FA
+                  </Text>
+                  <Text
+                    style={[
+                      styles.twoFASubtitle,
+                      { color: cardSubTextColor },
+                    ]}
+                  >
+                    {currentUser.is2FAEnabled
+                      ? 'Enabled ✅'
+                      : 'Protect your account'}
                   </Text>
                 </View>
                 {!currentUser.is2FAEnabled && (
@@ -257,15 +286,15 @@ const SettingsScreen = () => {
                     'Sign Out?',
                     'Are you sure you want to sign out?',
                     [
-                      {
-                        text: 'Cancel',
-                        style: 'cancel',
-                      },
+                      { text: 'Cancel', style: 'cancel' },
                       {
                         text: 'Sign Out',
                         onPress: async () => {
                           await signOut();
-                          Alert.alert('Signed Out', 'You have been signed out successfully');
+                          Alert.alert(
+                            'Signed Out',
+                            'You have been signed out successfully'
+                          );
                         },
                         style: 'destructive',
                       },
@@ -285,15 +314,17 @@ const SettingsScreen = () => {
                 end={{ x: 1, y: 1 }}
                 style={styles.secureAccountCard}
               >
-                <Text style={styles.secureAccountTitle}>🔐 Secure Your Account</Text>
+                <Text style={styles.secureAccountTitle}>
+                  🔐 Secure Your Account
+                </Text>
                 <Text style={styles.secureAccountText}>
-                  • Simple email-based 2FA{'\n'}
-                  • No phone required{'\n'}
-                  • Free & secure{'\n'}
-                  • Easy setup
+                  • Simple email-based 2FA{'\n'}• No phone required{'\n'}• Free
+                  & secure{'\n'}• Easy setup
                 </Text>
                 <View style={styles.createAccountButton}>
-                  <Text style={styles.createAccountButtonText}>Create Account</Text>
+                  <Text style={styles.createAccountButtonText}>
+                    Create Account
+                  </Text>
                 </View>
               </LinearGradient>
             </Pressable>
@@ -302,103 +333,202 @@ const SettingsScreen = () => {
 
         {/* Preferences Section */}
         <View style={styles.section}>
-          <View style={styles.card}>
+          <View style={[styles.card, cardStyle]}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardHeaderTitle}>Preferences</Text>
+              <Text
+                style={[styles.cardHeaderTitle, { color: cardTextColor }]}
+              >
+                Preferences
+              </Text>
             </View>
 
-            <Pressable style={styles.preferenceRow}>
+            {/* Notifications Toggle */}
+            <Pressable
+              style={[
+                styles.preferenceRow,
+                { borderBottomColor: cardBorderColor },
+              ]}
+            >
               <View style={styles.preferenceRowLeft}>
-                <Ionicons name="notifications-outline" size={24} color="#3b82f6" />
+                <View
+                  style={[
+                    styles.iconBadge,
+                    {
+                      backgroundColor: notificationsEnabled
+                        ? 'rgba(34,197,94,0.15)'
+                        : 'rgba(156,163,175,0.15)',
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      notificationsEnabled
+                        ? 'notifications'
+                        : 'notifications-off-outline'
+                    }
+                    size={20}
+                    color={notificationsEnabled ? '#22c55e' : '#9ca3af'}
+                  />
+                </View>
                 <View style={styles.preferenceRowText}>
-                  <Text style={styles.preferenceRowTitle}>Push Notifications</Text>
-                  <Text style={styles.preferenceRowSubtitle}>
-                    Price alerts and updates
+                  <Text
+                    style={[
+                      styles.preferenceRowTitle,
+                      { color: cardTextColor },
+                    ]}
+                  >
+                    Push Notifications
+                  </Text>
+                  <Text
+                    style={[
+                      styles.preferenceRowSubtitle,
+                      { color: cardSubTextColor },
+                    ]}
+                  >
+                    {notificationsEnabled
+                      ? 'Alerts enabled 🔔'
+                      : 'Alerts muted 🔕'}
                   </Text>
                 </View>
               </View>
               <Switch
                 value={notificationsEnabled}
                 onValueChange={handleNotificationToggle}
-                trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
+                trackColor={{ false: '#d1d5db', true: '#22c55e' }}
                 thumbColor={notificationsEnabled ? '#fff' : '#f3f4f6'}
               />
             </Pressable>
 
-            <Pressable style={styles.preferenceRowLast}>
+            {/* Dark Mode Toggle */}
+            <View style={styles.preferenceRowLast}>
               <View style={styles.preferenceRowLeft}>
-                <Ionicons name="moon-outline" size={24} color="#3b82f6" />
+                <View
+                  style={[
+                    styles.iconBadge,
+                    {
+                      backgroundColor: darkModeEnabled
+                        ? 'rgba(99,102,241,0.15)'
+                        : 'rgba(251,191,36,0.15)',
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={darkModeEnabled ? 'moon' : 'sunny-outline'}
+                    size={20}
+                    color={darkModeEnabled ? '#818cf8' : '#fbbf24'}
+                  />
+                </View>
                 <View style={styles.preferenceRowText}>
-                  <Text style={styles.preferenceRowTitle}>Dark Mode</Text>
-                  <Text style={styles.preferenceRowSubtitle}>
-                    Enable dark theme
+                  <Text
+                    style={[
+                      styles.preferenceRowTitle,
+                      { color: cardTextColor },
+                    ]}
+                  >
+                    Dark Mode
+                  </Text>
+                  <Text
+                    style={[
+                      styles.preferenceRowSubtitle,
+                      { color: cardSubTextColor },
+                    ]}
+                  >
+                    {darkModeEnabled ? 'Enabled 🌙' : 'Disabled ☀️'}
                   </Text>
                 </View>
               </View>
               <Switch
                 value={darkModeEnabled}
                 onValueChange={handleDarkModeToggle}
-                trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
-                thumbColor={darkModeEnabled ? '#fff' : '#f3f4f6'}
+                trackColor={{ false: '#d1d5db', true: '#6366f1' }}
+                thumbColor={darkModeEnabled ? '#a5b4fc' : '#f3f4f6'}
               />
-            </Pressable>
+            </View>
           </View>
         </View>
 
         {/* About Section */}
         <View style={styles.section}>
-          <View style={styles.card}>
+          <View style={[styles.card, cardStyle]}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardHeaderTitle}>About</Text>
+              <Text
+                style={[styles.cardHeaderTitle, { color: cardTextColor }]}
+              >
+                About
+              </Text>
             </View>
 
-            <Pressable onPress={handleRateApp} style={styles.menuRow}>
-              <View style={styles.menuRowLeft}>
-                <Ionicons name="star-outline" size={24} color="#3b82f6" />
-                <Text style={styles.menuRowText}>Rate StockRadar</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </Pressable>
-
-            <Pressable onPress={handleShareApp} style={styles.menuRow}>
-              <View style={styles.menuRowLeft}>
-                <Ionicons name="share-social-outline" size={24} color="#3b82f6" />
-                <Text style={styles.menuRowText}>Share App</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </Pressable>
-
-            <Pressable onPress={handleContactSupport} style={styles.menuRow}>
-              <View style={styles.menuRowLeft}>
-                <Ionicons name="mail-outline" size={24} color="#3b82f6" />
-                <Text style={styles.menuRowText}>Contact Support</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </Pressable>
-
-            <Pressable onPress={handlePrivacyPolicy} style={styles.menuRow}>
-              <View style={styles.menuRowLeft}>
-                <Ionicons name="shield-outline" size={24} color="#3b82f6" />
-                <Text style={styles.menuRowText}>Privacy Policy</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </Pressable>
-
-            <Pressable onPress={handleTermsOfService} style={styles.menuRow}>
-              <View style={styles.menuRowLeft}>
-                <Ionicons name="document-text-outline" size={24} color="#3b82f6" />
-                <Text style={styles.menuRowText}>Terms of Service</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </Pressable>
-
-            <Pressable onPress={handleClearCache} style={styles.menuRowLast}>
-              <View style={styles.menuRowLeft}>
-                <Ionicons name="trash-outline" size={24} color="#ef4444" />
-                <Text style={[styles.menuRowText, { color: '#ef4444' }]}>Clear Cache</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </Pressable>
+            {[
+              {
+                icon: 'star-outline',
+                label: 'Rate StockRadar',
+                color: '#fbbf24',
+                onPress: handleRateApp,
+              },
+              {
+                icon: 'share-social-outline',
+                label: 'Share App',
+                color: '#3b82f6',
+                onPress: handleShareApp,
+              },
+              {
+                icon: 'mail-outline',
+                label: 'Contact Support',
+                color: '#22c55e',
+                onPress: handleContactSupport,
+              },
+              {
+                icon: 'shield-outline',
+                label: 'Privacy Policy',
+                color: '#a78bfa',
+                onPress: handlePrivacyPolicy,
+              },
+              {
+                icon: 'document-text-outline',
+                label: 'Terms of Service',
+                color: '#60a5fa',
+                onPress: handleTermsOfService,
+              },
+              {
+                icon: 'trash-outline',
+                label: 'Clear Cache',
+                color: '#ef4444',
+                onPress: handleClearCache,
+                isLast: true,
+              },
+            ].map((item) => (
+              <Pressable
+                key={item.label}
+                onPress={item.onPress}
+                style={[
+                  item.isLast ? styles.menuRowLast : styles.menuRow,
+                  { borderBottomColor: cardBorderColor },
+                ]}
+              >
+                <View style={styles.menuRowLeft}>
+                  <Ionicons
+                    name={item.icon as any}
+                    size={22}
+                    color={item.color}
+                  />
+                  <Text
+                    style={[
+                      styles.menuRowText,
+                      {
+                        color: item.isLast ? '#ef4444' : cardTextColor,
+                      },
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={cardSubTextColor}
+                />
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -411,7 +541,8 @@ const SettingsScreen = () => {
               Made with ❤️ for smart investors
             </Text>
             <Text style={styles.appInfoBuild}>
-              Build: {Platform.OS === 'ios' ? 'iOS' : 'Android'} • {new Date().getFullYear()}
+              Build: {Platform.OS === 'ios' ? 'iOS' : 'Android'} •{' '}
+              {new Date().getFullYear()}
             </Text>
           </View>
         </View>
@@ -421,12 +552,8 @@ const SettingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  scrollView: { flex: 1 },
   header: {
     paddingTop: 64,
     paddingHorizontal: 24,
@@ -442,7 +569,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   card: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
   },
@@ -450,43 +576,27 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginBottom: 16,
     fontFamily: 'RubikBold',
-    color: '#000',
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
-  infoLabel: {
-    fontFamily: 'RubikMedium',
-    color: '#000',
-  },
-  infoValue: {
-    fontFamily: 'RubikRegular',
-    color: '#000',
-    maxWidth: '60%',
-  },
+  infoLabel: { fontFamily: 'RubikMedium' },
+  infoValue: { fontFamily: 'RubikRegular', maxWidth: '60%' },
   twoFARow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
-  flex1: {
-    flex: 1,
-  },
-  twoFATitle: {
-    fontFamily: 'RubikBold',
-    color: '#000',
-  },
+  flex1: { flex: 1 },
+  twoFATitle: { fontFamily: 'RubikBold' },
   twoFASubtitle: {
     fontFamily: 'RubikRegular',
     fontSize: 12,
-    color: '#666',
     marginTop: 2,
   },
   enableButton: {
@@ -537,14 +647,19 @@ const styles = StyleSheet.create({
     fontFamily: 'RubikBold',
   },
   cardHeader: {
-    paddingHorizontal: 0,
-    paddingTop: 0,
     paddingBottom: 8,
   },
   cardHeaderTitle: {
     fontSize: 18,
     fontFamily: 'RubikBold',
-    color: '#000',
+  },
+  iconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   preferenceRow: {
     flexDirection: 'row',
@@ -552,7 +667,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
   },
   preferenceRowLast: {
     flexDirection: 'row',
@@ -565,18 +679,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  preferenceRowText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  preferenceRowTitle: {
-    fontFamily: 'RubikMedium',
-    color: '#000',
-  },
+  preferenceRowText: { flex: 1 },
+  preferenceRowTitle: { fontFamily: 'RubikMedium' },
   preferenceRowSubtitle: {
     fontFamily: 'RubikRegular',
     fontSize: 12,
-    color: '#666',
     marginTop: 2,
   },
   menuRow: {
@@ -585,7 +692,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
   },
   menuRowLast: {
     flexDirection: 'row',
@@ -601,7 +707,6 @@ const styles = StyleSheet.create({
   menuRowText: {
     marginLeft: 12,
     fontFamily: 'RubikMedium',
-    color: '#000',
   },
   appInfoCard: {
     backgroundColor: 'rgba(255,255,255,0.1)',

@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useRouter } from "expo-router";
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   Pressable,
   ScrollView,
@@ -18,7 +19,7 @@ import {
 } from 'react-native';
 import Carousel from "react-native-reanimated-carousel";
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { blurhash } from "../../app/index";
+// import { blurhash } from "../../app/index";
 import { fetchMarketTickers } from '../api/marketApi';
 
 const { width } = Dimensions.get("window");
@@ -26,62 +27,56 @@ const { width } = Dimensions.get("window");
 const chunkArray = (array: any[], size: number) => {
   const chunks = [];
   for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size))
+    chunks.push(array.slice(i, i + size));
   }
   return chunks;
-}
+};
 
 const topStocks = ["AAPL", "GOOG", "MSFT", "AMZN", "TSLA"];
-const marketTypes = ["STOCKS", "ETF", "MUTUALFUNDS", "FUTURES"];
 
 const sortStocks = (stocks: any[]) => {
   if (!stocks || !stocks.length) return [];
-
-  // First find all the top stocks
-  const topStocksItems: any[] = stocks.filter((stock) => 
+  const topStocksItems: any[] = stocks.filter((stock) =>
     topStocks.includes(stock.symbol.toUpperCase())
   );
-
-  // Sort the top stocks according to priority
   const sortedTopStocks = topStocks
-    .map((symbol: any) => 
+    .map((symbol: any) =>
       topStocksItems.find((stock) => stock.symbol.toUpperCase() === symbol)
     )
     .filter(Boolean);
-
-  const otherStocks = stocks.filter((stock) => 
+  const otherStocks = stocks.filter((stock) =>
     !topStocks.includes(stock.symbol.toUpperCase())
   );
-
-  // Combine sorted top stocks with the rest of the stocks 
   return [...sortedTopStocks, ...otherStocks];
 };
 
-const transformETFData = (data: any) => {
-  return {
-    ...data,
-    body: data.body.map((item: any) => ({
-      symbol: item.symbol,
-      name: item.companyName,
-      pctchange: item.percentChange,
-      netchange: item.netChange,
-      marketCap: item.marketCap,
-      lastsale: item.lastSalePrice,
-    }))
-  }
-}
-
-type MarketType = "STOCKS" | "ETF" | "MUTUALFUNDS" | "FUTURES";
-
 export default function HomeScreen() {
-  const [selectedMarket, setSelectedMarket] = useState<MarketType>("STOCKS");
   const routerNav = useRouter();
 
-  // Recent stocks query with rate limit protection
-  const { 
-    data: recentStocksData, 
-    isPending: isLoadingRecentStocks, 
-    error: recentStocksError 
+  // Animated pulse for live dot
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.2,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const {
+    data: recentStocksData,
+    isPending: isLoadingRecentStocks,
+    error: recentStocksError
   } = useQuery({
     queryKey: ["recentStocks"],
     queryFn: () => fetchMarketTickers(1, "STOCKS"),
@@ -89,30 +84,8 @@ export default function HomeScreen() {
       if (!data || !data.body) return data;
       return {
         ...data,
-        body: sortStocks(data.body)
-      }
-    },
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 10,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
-    retry: 1,
-  });
-
-  // Market data query with rate limit protection
-  const { 
-    data: marketData, 
-    isPending: isLoadingMarket, 
-    error: marketError 
-  } = useQuery({
-    queryKey: ["marketTickers", selectedMarket],
-    queryFn: () => fetchMarketTickers(1, selectedMarket),
-    select: (data) => {
-      if (selectedMarket === "ETF") {
-        return transformETFData(data)
-      }
-      return data
+        body: sortStocks(data.body),
+      };
     },
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
@@ -133,16 +106,17 @@ export default function HomeScreen() {
         className="h-full"
       >
         <View className="h-full p-4">
+
           {/* Header */}
           <View className="flex-row justify-between items-center mb-4">
             <View className="w-1/2">
-              <Text 
+              <Text
                 className="text-white text-lg"
                 style={{ fontFamily: "RubikMedium" }}
               >
                 Good {new Date().getHours() < 12 ? "Morning" : "Afternoon"}
               </Text>
-              <Text 
+              <Text
                 className="text-white text-2xl font-bold"
                 style={{ fontFamily: "RubikBold" }}
               >
@@ -163,7 +137,7 @@ export default function HomeScreen() {
                     backgroundColor: "white",
                   }}
                   source={require("../../assets/images/logo.png")}
-                  placeholder={{ blurhash }}
+                  // placeholder={{ blurhash }}
                   contentFit="contain"
                   transition={1000}
                 />
@@ -188,10 +162,9 @@ export default function HomeScreen() {
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingBottom: 150,
-            }}
+            contentContainerStyle={{ paddingBottom: 150 }}
           >
+
             {/* Stocks Section */}
             <View className="p-4 rounded-2xl bg-blue-900/10 border border-white/20 overflow-hidden">
               <Text
@@ -201,7 +174,6 @@ export default function HomeScreen() {
                 Stocks {recentStocksData?.body?.length || 0}
               </Text>
 
-              {/* Show rate limit error if present */}
               {recentStocksError && (
                 <View className="bg-red-500/20 p-3 rounded-lg mb-3">
                   <Text className="text-red-300 text-xs" style={{ fontFamily: "RubikMedium" }}>
@@ -226,11 +198,9 @@ export default function HomeScreen() {
                       {chunk.map((stock: any) => {
                         const isPositive = !stock.netchange.startsWith("-");
                         return (
-                          <View 
+                          <View
                             key={stock.symbol}
-                            style={{
-                              width: (width - 64) / 4,
-                            }}
+                            style={{ width: (width - 64) / 4 }}
                             className="mb-2"
                           >
                             <TouchableOpacity
@@ -238,7 +208,7 @@ export default function HomeScreen() {
                             >
                               <View className="flex-row items-center">
                                 <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-2">
-                                  <Text 
+                                  <Text
                                     className="text-white text-base"
                                     style={{ fontFamily: "RubikBold" }}
                                   >
@@ -246,7 +216,7 @@ export default function HomeScreen() {
                                   </Text>
                                 </View>
                                 <View>
-                                  <Text 
+                                  <Text
                                     className="text-white text-sm"
                                     style={{ fontFamily: "RubikBold" }}
                                   >
@@ -262,13 +232,16 @@ export default function HomeScreen() {
                               </View>
                             </TouchableOpacity>
                           </View>
-                        )
+                        );
                       })}
                     </View>
                   )}
                 />
               ) : (
-                <Text className="text-white/60 text-center py-4 text-sm" style={{ fontFamily: "RubikMedium" }}>
+                <Text
+                  className="text-white/60 text-center py-4 text-sm"
+                  style={{ fontFamily: "RubikMedium" }}
+                >
                   No stocks available
                 </Text>
               )}
@@ -288,13 +261,9 @@ export default function HomeScreen() {
                   className="flex-1 bg-white/10 rounded-lg mr-2 p-4"
                 >
                   <View className="mb-2">
-                    <Ionicons
-                      name="analytics"
-                      size={24}
-                      color="#60a5fa"
-                    />
+                    <Ionicons name="analytics" size={24} color="#60a5fa" />
                   </View>
-                  <Text 
+                  <Text
                     className="text-white text-sm"
                     style={{ fontFamily: "RubikSemiBold" }}
                   >
@@ -307,18 +276,15 @@ export default function HomeScreen() {
                     Get insights on current market leaders
                   </Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={() => router.push("/(tabs)/watchlist")}
                   className="flex-1 bg-white/10 rounded-lg ml-2 p-4"
                 >
                   <View className="mb-2">
-                    <Ionicons
-                      name="star"
-                      size={24}
-                      color="#fbbf24"
-                    />
+                    <Ionicons name="star" size={24} color="#fbbf24" />
                   </View>
-                  <Text 
+                  <Text
                     className="text-white text-sm"
                     style={{ fontFamily: "RubikSemiBold" }}
                   >
@@ -334,131 +300,229 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Market Type Segments */}
-            <View className="mb-4">
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="mb-4"
+            {/* 🔥 MARKET PULSE - WOW SECTION */}
+            <View className="mb-6">
+              <LinearGradient
+                colors={[
+                  'rgba(255,255,255,0.05)',
+                  'rgba(59,130,246,0.1)',
+                  'rgba(255,255,255,0.03)'
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  borderRadius: 16,
+                  padding: 24,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.2)',
+                  marginBottom: 16,
+                  overflow: 'hidden',
+                }}
               >
-                {marketTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    onPress={() => setSelectedMarket(type as MarketType)}
-                    className={`px-4 py-2 mr-2 rounded-full ${
-                      selectedMarket === type ? "bg-white" : "bg-white/10"
-                    }`}
+                {/* Live Pulse Title */}
+                <View className="flex-row items-center mb-4">
+                  <Animated.View
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: '#34d399',
+                      marginRight: 8,
+                      opacity: pulseAnim,
+                    }}
+                  />
+                  <Text
+                    className="text-white text-xl"
+                    style={{ fontFamily: "RubikBold" }}
                   >
-                    <Text
-                      className={`${selectedMarket === type ? "text-black" : "text-white"}`}
-                      style={{
-                        fontFamily: selectedMarket === type ? "RubikBold" : "RubikSemiBold"
-                      }}
-                    >
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            {/* Indices Section */}
-            <View className="mb-4">
-              <Text
-                className="text-white text-lg mb-3"
-                style={{ fontFamily: "RubikBold" }}
-              >
-                Indices
-              </Text>
-
-              {/* Show rate limit error if present */}
-              {marketError && (
-                <View className="bg-red-500/20 p-3 rounded-lg mb-3">
-                  <Text className="text-red-300 text-xs" style={{ fontFamily: "RubikMedium" }}>
-                    ⚠️ Rate limit exceeded. Please try again in a few minutes.
+                    Market Pulse
                   </Text>
                 </View>
-              )}
 
-              {isLoadingMarket ? (
-                <View className="h-32 justify-center items-center bg-white/10 rounded-lg">
-                  <ActivityIndicator size="small" color="white" />
+                {/* Stats Row */}
+                <View className="flex-row justify-between">
+                  <View className="flex-1 mr-2">
+                    <Text
+                      className="text-white/60 text-xs mb-1"
+                      style={{ fontFamily: "RubikMedium" }}
+                    >
+                      Market Cap
+                    </Text>
+                    <Text
+                      className="text-white text-2xl"
+                      style={{ fontFamily: "RubikBold" }}
+                    >
+                      $2.8T
+                    </Text>
+                  </View>
+
+                  <View
+                    style={{
+                      width: 1,
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      marginHorizontal: 8,
+                    }}
+                  />
+
+                  <View className="flex-1 mx-2">
+                    <Text
+                      className="text-white/60 text-xs mb-1"
+                      style={{ fontFamily: "RubikMedium" }}
+                    >
+                      Volume
+                    </Text>
+                    <Text
+                      className="text-white text-2xl"
+                      style={{ fontFamily: "RubikBold" }}
+                    >
+                      45B
+                    </Text>
+                  </View>
+
+                  <View
+                    style={{
+                      width: 1,
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      marginHorizontal: 8,
+                    }}
+                  />
+
+                  <View className="flex-1 ml-2">
+                    <Text
+                      className="text-white/60 text-xs mb-1"
+                      style={{ fontFamily: "RubikMedium" }}
+                    >
+                      Advance/Decline
+                    </Text>
+                    <Text
+                      className="text-emerald-400 text-2xl"
+                      style={{ fontFamily: "RubikBold" }}
+                    >
+                      1,234 ↗
+                    </Text>
+                  </View>
                 </View>
-              ) : marketData?.body && marketData.body.length > 0 ? (
-                <Carousel
-                  loop={false}
-                  width={width - 32}
-                  height={160}
-                  data={chunkArray(marketData?.body || [], 2)}
-                  scrollAnimationDuration={1000}
-                  renderItem={({ item: chunk }) => (
-                    <View className="gap-2 w-[98%]">
-                      {chunk.map((item: any) => {
-                        const isPositive = !item.netchange.startsWith("-");
-                        return (
-                          <TouchableOpacity
-                            key={item.symbol}
-                            onPress={() => router.push(`/stock/${item.symbol}`)}
-                            className="bg-white/10 rounded-lg p-4"
-                          >
-                            <View className="flex-row items-center">
-                              <View className="w-12 h-12 rounded-full bg-white/20 items-center justify-center mr-3">
-                                <Text
-                                  className="text-white text-lg"
-                                  style={{ fontFamily: "RubikBold" }}
-                                >
-                                  {item.symbol.charAt(0)}
-                                </Text>
-                              </View>
 
-                              <View className="flex-1 flex-row justify-between items-center">
-                                <View className="flex-1 mr-2">
-                                  <Text
-                                    className="text-white text-base"
-                                    style={{ fontFamily: "RubikBold" }}
-                                    numberOfLines={1}
-                                  >
-                                    {item?.symbol}
-                                  </Text>
-                                  <Text
-                                    className="text-white/70 text-xs mt-1"
-                                    style={{ fontFamily: "RubikMedium" }}
-                                    numberOfLines={1}
-                                  >
-                                    {item?.name}
-                                  </Text>
-                                </View>
+                {/* Footer */}
+                <View
+                  style={{
+                    marginTop: 16,
+                    paddingTop: 16,
+                    borderTopWidth: 1,
+                    borderTopColor: 'rgba(255,255,255,0.1)',
+                  }}
+                >
+                  <Text
+                    className="text-white/70 text-xs"
+                    style={{ fontFamily: "RubikMedium" }}
+                  >
+                    Live market data • Updated 2s ago
+                  </Text>
+                </View>
+              </LinearGradient>
 
-                                <View className="items-end">
-                                  <Text
-                                    className="text-white text-base"
-                                    style={{ fontFamily: "RubikBold" }}
-                                  >
-                                    ${item?.lastsale}
-                                  </Text>
-                                  <Text
-                                    style={{ fontFamily: "RubikSemiBold" }}
-                                    className={`text-sm ${
-                                      isPositive ? "text-green-500" : "text-red-500"
-                                    }`}
-                                  >
-                                    {item.pctchange}
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                          </TouchableOpacity>
-                        )
-                      })}
-                    </View>
-                  )}
-                />
-              ) : (
-                <Text className="text-white/60 text-center py-4 text-sm" style={{ fontFamily: "RubikMedium" }}>
-                  No data available
-                </Text>
-              )}
+              {/* 3D Glassmorphism Cards */}
+              <View className="flex-row">
+                <Pressable
+                  onPress={() => router.push("/search?tag=magnificent7")}
+                  style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(30,41,59,0.8)',
+                    borderRadius: 16,
+                    padding: 16,
+                    marginRight: 8,
+                    borderWidth: 1,
+                    borderColor: 'rgba(100,116,139,0.4)',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 10 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 20,
+                    elevation: 15,
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#a855f7', '#ec4899']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Ionicons name="rocket" size={20} color="white" />
+                  </LinearGradient>
+                  <Text
+                    className="text-white text-sm mb-1"
+                    style={{ fontFamily: "RubikBold" }}
+                  >
+                    Magnificent 7
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: "RubikRegular",
+                      color: '#94a3b8',
+                      fontSize: 11,
+                    }}
+                  >
+                    AAPL, MSFT, NVDA + 4 more
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => router.push("/search?tag=indian-bluechips")}
+                  style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(6,78,59,0.5)',
+                    borderRadius: 16,
+                    padding: 16,
+                    marginLeft: 8,
+                    borderWidth: 1,
+                    borderColor: 'rgba(52,211,153,0.3)',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 10 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 20,
+                    elevation: 15,
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#10b981', '#14b8a6']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Ionicons name="trending-up" size={20} color="white" />
+                  </LinearGradient>
+                  <Text
+                    className="text-white text-sm mb-1"
+                    style={{ fontFamily: "RubikBold" }}
+                  >
+                    Indian Bluechips
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: "RubikRegular",
+                      color: '#6ee7b7',
+                      fontSize: 11,
+                    }}
+                  >
+                    RELIANCE, TCS, HDFCBANK
+                  </Text>
+                </Pressable>
+              </View>
             </View>
+
           </ScrollView>
         </View>
       </LinearGradient>

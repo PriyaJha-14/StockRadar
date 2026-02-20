@@ -23,7 +23,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Line, Rect } from 'react-native-svg';
-import { blurhash } from "../../app/index";
+// import { blurhash } from "../../app/index";
 import {
   calculateHealthScore,
   fetchFinancialSummary,
@@ -163,10 +163,10 @@ const StockDetailsScreen = () => {
       const change = lastPrice - firstPrice;
       const percentChange = (change / firstPrice) * 100;
 
-      return { 
-        change: isNaN(change) ? 0 : change, 
-        percentChange: isNaN(percentChange) ? 0 : percentChange, 
-        isPositive: change > 0 
+      return {
+        change: isNaN(change) ? 0 : change,
+        percentChange: isNaN(percentChange) ? 0 : percentChange,
+        isPositive: change > 0
       };
     } catch (error) {
       console.error('Error calculating price change:', error);
@@ -235,9 +235,11 @@ const StockDetailsScreen = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const getGradientColors = (index: number) => {
-    return GRADIENT_COLORS[index % GRADIENT_COLORS.length];
+  
+  const getGradientColors = (index: number): [string, string] => {
+    return GRADIENT_COLORS[index % GRADIENT_COLORS.length] as [string, string];
   };
+
 
   const handleTimeframeSelect = (index: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -294,10 +296,10 @@ const StockDetailsScreen = () => {
           <View>
             <Text style={chartStyles.price}>{currencySymbol}{currentPrice.toFixed(2)}</Text>
             <View style={chartStyles.changeContainer}>
-              <Ionicons 
-                name={isPositive ? "arrow-up" : "arrow-down"} 
-                size={16} 
-                color={lineColor} 
+              <Ionicons
+                name={isPositive ? "arrow-up" : "arrow-down"}
+                size={16}
+                color={lineColor}
               />
               <Text style={[chartStyles.change, { color: lineColor }]}>
                 {currencySymbol}{Math.abs(priceChange).toFixed(2)} ({Math.abs(percentChange).toFixed(2)}%)
@@ -349,9 +351,9 @@ const StockDetailsScreen = () => {
 
         {/* Candlestick Chart */}
         <View style={chartStyles.chartContainer}>
-          <View style={{ 
-            backgroundColor: '#f8fafc', 
-            borderRadius: 12, 
+          <View style={{
+            backgroundColor: '#f8fafc',
+            borderRadius: 12,
             padding: 12,
             borderWidth: 1,
             borderColor: '#e2e8f0',
@@ -444,46 +446,46 @@ const StockDetailsScreen = () => {
             </Svg>
 
             {/* High/Low Labels */}
-            <View style={{ 
-              flexDirection: 'row', 
-              justifyContent: 'space-between', 
-              marginTop: 8, 
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 8,
               paddingHorizontal: 12,
               borderTopWidth: 1,
               borderTopColor: '#e2e8f0',
               paddingTop: 8,
             }}>
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ 
-                  fontSize: 10, 
-                  color: '#ef4444', 
+                <Text style={{
+                  fontSize: 10,
+                  color: '#ef4444',
                   fontFamily: 'RubikBold',
                   marginBottom: 2,
                 }}>
                   Low
                 </Text>
-                <Text style={{ 
-                  fontSize: 11, 
-                  color: '#64748b', 
-                  fontFamily: 'RubikMedium' 
+                <Text style={{
+                  fontSize: 11,
+                  color: '#64748b',
+                  fontFamily: 'RubikMedium'
                 }}>
                   {currencySymbol}{minPrice.toFixed(2)}
                 </Text>
               </View>
 
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ 
-                  fontSize: 10, 
-                  color: '#22c55e', 
+                <Text style={{
+                  fontSize: 10,
+                  color: '#22c55e',
                   fontFamily: 'RubikBold',
                   marginBottom: 2,
                 }}>
                   High
                 </Text>
-                <Text style={{ 
-                  fontSize: 11, 
-                  color: '#64748b', 
-                  fontFamily: 'RubikMedium' 
+                <Text style={{
+                  fontSize: 11,
+                  color: '#64748b',
+                  fontFamily: 'RubikMedium'
                 }}>
                   {currencySymbol}{maxPrice.toFixed(2)}
                 </Text>
@@ -491,33 +493,51 @@ const StockDetailsScreen = () => {
             </View>
           </View>
 
-          {/* OHLC Data */}
-          <View style={chartStyles.ohlcContainer}>
-            <View style={chartStyles.ohlcRow}>
-              <Text style={chartStyles.ohlcLabel}>Open</Text>
-              <Text style={chartStyles.ohlcValue}>
-                {currencySymbol}{processedChartData[processedChartData.length - 1]?.open.toFixed(2)}
-              </Text>
-            </View>
-            <View style={chartStyles.ohlcRow}>
-              <Text style={chartStyles.ohlcLabel}>High</Text>
-              <Text style={[chartStyles.ohlcValue, { color: '#22c55e' }]}>
-                {currencySymbol}{processedChartData[processedChartData.length - 1]?.high.toFixed(2)}
-              </Text>
-            </View>
-            <View style={chartStyles.ohlcRow}>
-              <Text style={chartStyles.ohlcLabel}>Low</Text>
-              <Text style={[chartStyles.ohlcValue, { color: '#ef4444' }]}>
-                {currencySymbol}{processedChartData[processedChartData.length - 1]?.low.toFixed(2)}
-              </Text>
-            </View>
-            <View style={chartStyles.ohlcRow}>
-              <Text style={chartStyles.ohlcLabel}>Close</Text>
-              <Text style={chartStyles.ohlcValue}>
-                {currencySymbol}{processedChartData[processedChartData.length - 1]?.close.toFixed(2)}
-              </Text>
-            </View>
-          </View>
+          {/* OHLC Data - FIXED */}
+          {(() => {
+            const quote = quoteData?.body?.[0];
+
+            // Use quoteData fields directly — these are always correct
+            const open = quote?.regularMarketOpen ||
+              quote?.regularMarketPrice || 0;
+            const high = quote?.regularMarketDayHigh ||
+              quote?.regularMarketPrice || 0;
+            const low = quote?.regularMarketDayLow ||
+              quote?.regularMarketPrice || 0;
+            const close = quote?.regularMarketPrice ||
+              quote?.regularMarketPreviousClose || 0;
+
+            return (
+              <View style={chartStyles.ohlcContainer}>
+                <View style={chartStyles.ohlcRow}>
+                  <Text style={chartStyles.ohlcLabel}>Open</Text>
+                  <Text style={chartStyles.ohlcValue}>
+                    {currencySymbol}{open > 0 ? open.toFixed(2) : '--'}
+                  </Text>
+                </View>
+                <View style={chartStyles.ohlcRow}>
+                  <Text style={chartStyles.ohlcLabel}>High</Text>
+                  <Text style={[chartStyles.ohlcValue, { color: '#22c55e' }]}>
+                    {currencySymbol}{high > 0 ? high.toFixed(2) : '--'}
+                  </Text>
+                </View>
+                <View style={chartStyles.ohlcRow}>
+                  <Text style={chartStyles.ohlcLabel}>Low</Text>
+                  <Text style={[chartStyles.ohlcValue, { color: '#ef4444' }]}>
+                    {currencySymbol}{low > 0 ? low.toFixed(2) : '--'}
+                  </Text>
+                </View>
+                <View style={chartStyles.ohlcRow}>
+                  <Text style={chartStyles.ohlcLabel}>Close</Text>
+                  <Text style={chartStyles.ohlcValue}>
+                    {currencySymbol}{close > 0 ? close.toFixed(2) : '--'}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
+
+
         </View>
 
         {/* Chart Info Bar */}
@@ -542,8 +562,8 @@ const StockDetailsScreen = () => {
   const renderTimeframeSelector = () => {
     return (
       <View style={timeframeStyles.container}>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={timeframeStyles.scrollContent}
         >
@@ -585,7 +605,7 @@ const StockDetailsScreen = () => {
           <Image
             source={{ uri: item.image }}
             style={{ width: '100%', height: 200 }}
-            placeholder={{ blurhash }}
+            // placeholder={{ blurhash }}
             contentFit="cover"
             transition={200}
             cachePolicy="memory-disk"
@@ -599,9 +619,9 @@ const StockDetailsScreen = () => {
             colors={getGradientColors(index)}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={{ 
-              width: '100%', 
-              height: 200, 
+            style={{
+              width: '100%',
+              height: 200,
               justifyContent: 'center',
               alignItems: 'center',
               padding: 20,
@@ -609,10 +629,10 @@ const StockDetailsScreen = () => {
           >
             <View style={{ alignItems: 'center' }}>
               <Ionicons name="analytics" size={64} color="white" style={{ opacity: 0.9 }} />
-              <Text style={{ 
-                color: 'white', 
-                marginTop: 16, 
-                fontFamily: "RubikBold", 
+              <Text style={{
+                color: 'white',
+                marginTop: 16,
+                fontFamily: "RubikBold",
                 fontSize: 24,
                 textAlign: 'center',
                 textShadowColor: 'rgba(0,0,0,0.3)',
@@ -621,10 +641,10 @@ const StockDetailsScreen = () => {
               }}>
                 {symbol}
               </Text>
-              <Text style={{ 
-                color: 'white', 
-                marginTop: 8, 
-                fontFamily: "RubikMedium", 
+              <Text style={{
+                color: 'white',
+                marginTop: 8,
+                fontFamily: "RubikMedium",
                 fontSize: 14,
                 opacity: 0.95,
                 textAlign: 'center',
@@ -648,8 +668,8 @@ const StockDetailsScreen = () => {
             </Text>
           </View>
 
-          <Text 
-            className="text-gray-900 text-base mb-2" 
+          <Text
+            className="text-gray-900 text-base mb-2"
             style={{ fontFamily: "RubikBold", lineHeight: 22 }}
             numberOfLines={3}
           >
@@ -657,8 +677,8 @@ const StockDetailsScreen = () => {
           </Text>
 
           {item.summary && item.summary.length > 0 && (
-            <Text 
-              className="text-gray-600 text-sm mb-3" 
+            <Text
+              className="text-gray-600 text-sm mb-3"
               style={{ fontFamily: "RubikRegular", lineHeight: 20 }}
               numberOfLines={2}
             >
@@ -684,16 +704,14 @@ const StockDetailsScreen = () => {
           <Pressable
             key={tab}
             onPress={() => setActiveTab(index)}
-            className={`flex-1 py-3 items-center ${
-              activeTab === index
-                ? "border-b-2 border-blue-600"
-                : "border-b-2 border-transparent"
-            }`}
+            className={`flex-1 py-3 items-center ${activeTab === index
+              ? "border-b-2 border-blue-600"
+              : "border-b-2 border-transparent"
+              }`}
           >
             <Text
-              className={`${
-                activeTab === index ? "text-blue-600" : "text-gray-600"
-              }`}
+              className={`${activeTab === index ? "text-blue-600" : "text-gray-600"
+                }`}
               style={{ fontFamily: "RubikMedium" }}
             >
               {tab}
@@ -779,9 +797,8 @@ const StockDetailsScreen = () => {
               {profile.companyOfficers.slice(0, 5).map((officer: any, index: number) => (
                 <View
                   key={index}
-                  className={`py-2 ${
-                    index < Math.min(profile.companyOfficers.length, 5) - 1 ? "border-b border-gray-200" : ""
-                  }`}
+                  className={`py-2 ${index < Math.min(profile.companyOfficers.length, 5) - 1 ? "border-b border-gray-200" : ""
+                    }`}
                 >
                   <Text className="font-bold" style={{ fontFamily: "RubikBold" }}>{officer.name}</Text>
                   <Text className="text-gray-600 text-sm" style={{ fontFamily: "RubikMedium" }}>{officer.title}</Text>
@@ -835,12 +852,12 @@ const StockDetailsScreen = () => {
 
           <View className="flex-row items-center mb-2">
             <View className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden mr-3">
-              <View 
-                className="h-full rounded-full" 
-                style={{ 
-                  width: `${healthScore}%`, 
-                  backgroundColor: healthInfo.color 
-                }} 
+              <View
+                className="h-full rounded-full"
+                style={{
+                  width: `${healthScore}%`,
+                  backgroundColor: healthInfo.color
+                }}
               />
             </View>
             <Text className="text-gray-900 text-2xl" style={{ fontFamily: "RubikBold" }}>
@@ -851,9 +868,9 @@ const StockDetailsScreen = () => {
           <Text className="text-gray-700" style={{ fontFamily: "RubikMedium" }}>
             {healthInfo.label} - {
               healthScore >= 80 ? "Strong fundamentals with healthy financials" :
-              healthScore >= 60 ? "Good financial position with room for improvement" :
-              healthScore >= 40 ? "Average financial health, monitor closely" :
-              "Financial metrics need attention"
+                healthScore >= 60 ? "Good financial position with room for improvement" :
+                  healthScore >= 40 ? "Average financial health, monitor closely" :
+                    "Financial metrics need attention"
             }
           </Text>
         </View>
@@ -1033,7 +1050,7 @@ const StockDetailsScreen = () => {
               {finData.revenueGrowth !== undefined && (
                 <View className="flex-row justify-between py-2 border-b border-gray-200">
                   <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Revenue Growth (YoY)</Text>
-                  <Text 
+                  <Text
                     className={finData.revenueGrowth > 0 ? "text-green-600" : "text-red-600"}
                     style={{ fontFamily: "RubikBold" }}
                   >
@@ -1044,7 +1061,7 @@ const StockDetailsScreen = () => {
               {finData.earningsGrowth !== undefined && (
                 <View className="flex-row justify-between py-2">
                   <Text className="text-gray-600" style={{ fontFamily: "RubikBold" }}>Earnings Growth (YoY)</Text>
-                  <Text 
+                  <Text
                     className={finData.earningsGrowth > 0 ? "text-green-600" : "text-red-600"}
                     style={{ fontFamily: "RubikBold" }}
                   >
@@ -1168,7 +1185,7 @@ const StockDetailsScreen = () => {
           </Pressable>
         </View>
 
-        <ScrollView 
+        <ScrollView
           className="flex-1"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 200 }}
@@ -1252,7 +1269,7 @@ const StockDetailsScreen = () => {
                     <Text className="text-gray-700 text-center mt-4" style={{ fontFamily: "RubikMedium" }}>
                       No recent news available for {symbol}
                     </Text>
-                    <Pressable 
+                    <Pressable
                       onPress={() => refetchNews()}
                       className="bg-blue-600 rounded-lg px-6 py-3 mt-4"
                     >
@@ -1317,7 +1334,7 @@ const StockDetailsScreen = () => {
         </View>
       </Modal>
 
-      <View 
+      <View
         className="absolute bottom-0 left-0 right-0 pb-6 pt-4 px-5"
         style={{ backgroundColor: '#00194b', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}
       >
@@ -1336,7 +1353,7 @@ const StockDetailsScreen = () => {
             <Image
               style={{ flex: 1, width: "100%", height: "100%", borderRadius: 40, backgroundColor: "white" }}
               source={require("../../assets/images/logo.png")}
-              placeholder={{ blurhash }}
+              // placeholder={{ blurhash }}
               contentFit="contain"
               transition={1000}
             />

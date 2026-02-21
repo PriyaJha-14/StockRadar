@@ -1,10 +1,11 @@
 // app/store/watchlistStore.ts
+import { supabase } from "@/utils/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { Alert } from "react-native";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { useSimpleAuthStore } from "./simpleAuthStore";
+import { useAuthStore } from "./authStore";
 
 interface WatchlistState {
   stocks: string[];
@@ -12,20 +13,21 @@ interface WatchlistState {
   removeStock: (stock: string) => void;
   isInWatchlist: (stock: string) => boolean;
   loadUserWatchlist: () => void;
+  loadFromCloud: (userId: string) => Promise<void>;
 }
 
 // Auth check helper
 const checkAuth = () => {
-  const { isAuthenticated } = useSimpleAuthStore.getState();
+  const { isAuthenticated } = useAuthStore.getState();
   if (!isAuthenticated) {
     Alert.alert(
       '🔒 Sign In Required',
       'You need to sign in to add stocks to your watchlist',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign In', 
-          onPress: () => router.push('/auth/simple-signin') 
+        {
+          text: 'Sign In',
+          onPress: () => router.push('/auth/simple-signin')
         },
       ]
     );
@@ -38,9 +40,8 @@ export const useWatchlistStore = create<WatchlistState>()(
   persist(
     (set, get) => ({
       stocks: [],
-      
-      addStock: (symbol) => {
-        // ✅ Check authentication first
+
+      addStock: async (symbol) => {
         if (!checkAuth()) return;
 
         const currentStocks = get().stocks;
@@ -53,27 +54,32 @@ export const useWatchlistStore = create<WatchlistState>()(
         const updatedStocks = [...currentStocks, symbol];
         set({ stocks: updatedStocks });
 
-        // ✅ Sync to user account
-        const { currentUser, updateWatchlist } = useSimpleAuthStore.getState();
-        if (currentUser) {
-          updateWatchlist(updatedStocks);
+        // ✅ Save to Supabase
+        const { user } = useAuthStore.getState();
+        if (user?.id) {
+          await supabase
+            .from('watchlist')
+            .insert({ user_id: user.id, symbol });
         }
 
         Alert.alert('✅ Added to Watchlist', `${symbol} added successfully`);
         console.log('✅ Added to watchlist:', symbol);
       },
 
-      removeStock: (symbol) => {
-        // ✅ Check authentication
+      removeStock: async (symbol) => {
         if (!checkAuth()) return;
 
         const updatedStocks = get().stocks.filter((s) => s !== symbol);
         set({ stocks: updatedStocks });
 
-        // ✅ Sync to user account
-        const { currentUser, updateWatchlist } = useSimpleAuthStore.getState();
-        if (currentUser) {
-          updateWatchlist(updatedStocks);
+        // ✅ Delete from Supabase
+        const { user } = useAuthStore.getState();
+        if (user?.id) {
+          await supabase
+            .from('watchlist')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('symbol', symbol);
         }
 
         console.log('✅ Removed from watchlist:', symbol);
@@ -81,12 +87,24 @@ export const useWatchlistStore = create<WatchlistState>()(
 
       isInWatchlist: (symbol) => get().stocks.includes(symbol),
 
-      // ✅ Load user's watchlist data
+      // ✅ Load user watchlist (kept for backward compat)
       loadUserWatchlist: () => {
-        const { currentUser } = useSimpleAuthStore.getState();
-        if (currentUser) {
-          set({ stocks: currentUser.watchlist || [] });
-          console.log('📂 Loaded user watchlist');
+        const { user } = useAuthStore.getState();
+        if (user?.id) {
+          get().loadFromCloud(user.id);
+        }
+      },
+
+      // ✅ Load from Supabase cloud
+      loadFromCloud: async (userId) => {
+        const { data, error } = await supabase
+          .from('watchlist')
+          .select('symbol')
+          .eq('user_id', userId);
+
+        if (!error && data) {
+          set({ stocks: data.map((row: any) => row.symbol) });
+          console.log('📂 Loaded watchlist from cloud');
         }
       },
     }),

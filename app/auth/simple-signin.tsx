@@ -1,324 +1,344 @@
+// app/auth/simple-signin.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { useSimpleAuthStore } from '../store/simpleAuthStore';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuthStore } from '../store/authStore';
+import { usePortfolioStore } from '../store/portfolioStore';
+import { useWatchlistStore } from '../store/watchlistStore';
 
-const SimpleSignInScreen = () => {
+export default function SignInScreen() {
+  const { signIn } = useAuthStore();
+  const { loadFromCloud } = usePortfolioStore();
+  const { loadFromCloud: loadWatchlist } = useWatchlistStore();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showOTP, setShowOTP] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  const { signIn, verifyOTP, pendingVerification } = useSimpleAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSignIn = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill all fields');
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('⚠️ Missing Fields', 'Please enter email and password');
       return;
     }
 
-    setLoading(true);
-    try {
-      const result = await signIn(email, password);
-      
-      if (result.needsOTP) {
-        setShowOTP(true);
-        Alert.alert(
-          '2FA Required 🔐',
-          'Check console for OTP code\n(In real app, check your email)'
-        );
-      } else {
-        router.replace('/(tabs)');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setIsLoading(true);
+    const { error } = await signIn(email.trim().toLowerCase(), password);
+    setIsLoading(false);
 
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
-      Alert.alert('Error', 'Please enter 6-digit code');
+    if (error) {
+      Alert.alert('❌ Sign In Failed', error);
       return;
     }
 
-    setLoading(true);
-    try {
-      const verified = await verifyOTP(otp);
-      if (verified) {
-        Alert.alert('Success! ✅', 'Login successful!', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') }
-        ]);
-      } else {
-        Alert.alert('Error', 'Invalid OTP code');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    } finally {
-      setLoading(false);
+    // ✅ Load user data from Supabase after login
+    const { user } = useAuthStore.getState();
+    if (user?.id) {
+      await loadFromCloud(user.id);
+      await loadWatchlist(user.id);
     }
+
+    Alert.alert('✅ Welcome Back!', `Signed in as ${email}`, [
+      { text: 'OK', onPress: () => router.replace('/(tabs)') },
+    ]);
   };
 
   return (
-    <LinearGradient
-      colors={['#00194b', '#0C0C0C']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={{ flex: 1 }}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={['#00194b', '#0C0C0C']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
         style={{ flex: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
         >
-          <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
-            {/* Header */}
-            <View style={{ alignItems: 'center', marginBottom: 32 }}>
-              <Text style={{ color: 'white', fontSize: 36, marginBottom: 8, fontFamily: 'RubikBold' }}>
-                {showOTP ? 'Enter OTP' : 'Welcome Back'}
-              </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, fontFamily: 'RubikRegular' }}>
-                {showOTP ? 'Check your email for code' : 'Sign in to continue'}
-              </Text>
-            </View>
-
-            {/* Form Container */}
-            <View style={{ 
-              backgroundColor: 'rgba(255,255,255,0.1)', 
-              borderRadius: 16, 
-              padding: 24 
-            }}>
-              {!showOTP ? (
-                <>
-                  {/* Email Input */}
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ color: 'white', marginBottom: 8, fontFamily: 'RubikMedium' }}>
-                      Email Address
-                    </Text>
-                    <View style={{ 
-                      backgroundColor: 'rgba(255,255,255,0.2)', 
-                      borderRadius: 12, 
-                      flexDirection: 'row', 
-                      alignItems: 'center', 
-                      paddingHorizontal: 16 
-                    }}>
-                      <Ionicons name="mail-outline" size={20} color="white" />
-                      <TextInput
-                        style={{ 
-                          flex: 1, 
-                          paddingVertical: 16, 
-                          paddingHorizontal: 12, 
-                          color: 'white',
-                          fontFamily: 'RubikRegular'
-                        }}
-                        placeholder="your@email.com"
-                        placeholderTextColor="rgba(255,255,255,0.5)"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                      />
-                    </View>
-                  </View>
-
-                  {/* Password Input */}
-                  <View style={{ marginBottom: 24 }}>
-                    <Text style={{ color: 'white', marginBottom: 8, fontFamily: 'RubikMedium' }}>
-                      Password
-                    </Text>
-                    <View style={{ 
-                      backgroundColor: 'rgba(255,255,255,0.2)', 
-                      borderRadius: 12, 
-                      flexDirection: 'row', 
-                      alignItems: 'center', 
-                      paddingHorizontal: 16 
-                    }}>
-                      <Ionicons name="lock-closed-outline" size={20} color="white" />
-                      <TextInput
-                        style={{ 
-                          flex: 1, 
-                          paddingVertical: 16, 
-                          paddingHorizontal: 12, 
-                          color: 'white',
-                          fontFamily: 'RubikRegular'
-                        }}
-                        placeholder="Enter password"
-                        placeholderTextColor="rgba(255,255,255,0.5)"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry={!showPassword}
-                      />
-                      <Pressable onPress={() => setShowPassword(!showPassword)}>
-                        <Ionicons
-                          name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                          size={20}
-                          color="white"
-                        />
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  {/* Sign In Button */}
-                  <Pressable
-                    onPress={handleSignIn}
-                    disabled={loading}
-                    style={{
-                      backgroundColor: '#3b82f6',
-                      borderRadius: 12,
-                      paddingVertical: 16,
-                      alignItems: 'center',
-                      marginBottom: 16,
-                    }}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="white" />
-                    ) : (
-                      <Text style={{ color: 'white', fontSize: 18, fontFamily: 'RubikBold' }}>
-                        Sign In
-                      </Text>
-                    )}
-                  </Pressable>
-
-                  {/* Sign Up Link */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'RubikRegular' }}>
-                      Don't have an account?{' '}
-                    </Text>
-                    <Pressable onPress={() => router.push('../auth/simple-signup')}>
-                      <Text style={{ color: '#60a5fa', fontFamily: 'RubikBold' }}>
-                        Sign Up
-                      </Text>
-                    </Pressable>
-                  </View>
-                </>
-              ) : (
-                <>
-                  {/* OTP Input */}
-                  <View style={{ marginBottom: 24 }}>
-                    <Text style={{ 
-                      color: 'white', 
-                      marginBottom: 16, 
-                      textAlign: 'center',
-                      fontFamily: 'RubikMedium' 
-                    }}>
-                      Enter 6-digit code
-                    </Text>
-                    <TextInput
-                      style={{ 
-                        backgroundColor: 'rgba(255,255,255,0.2)',
-                        borderRadius: 12,
-                        paddingHorizontal: 16,
-                        paddingVertical: 16,
-                        color: 'white',
-                        textAlign: 'center',
-                        fontSize: 24,
-                        fontFamily: 'RubikBold',
-                        letterSpacing: 8,
-                      }}
-                      placeholder="000000"
-                      placeholderTextColor="rgba(255,255,255,0.5)"
-                      value={otp}
-                      onChangeText={setOtp}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                    />
-                    
-                    {pendingVerification && (
-                      <View style={{ 
-                        backgroundColor: 'rgba(234, 179, 8, 0.2)',
-                        borderRadius: 12,
-                        padding: 12,
-                        marginTop: 16,
-                      }}>
-                        <Text style={{ 
-                          color: '#fcd34d', 
-                          textAlign: 'center',
-                          fontFamily: 'RubikMedium'
-                        }}>
-                          📧 Demo: Your code is {pendingVerification.code}
-                        </Text>
-                        <Text style={{ 
-                          color: 'rgba(252, 211, 77, 0.7)',
-                          fontSize: 12,
-                          textAlign: 'center',
-                          marginTop: 4,
-                          fontFamily: 'RubikRegular'
-                        }}>
-                          (In production, this would be sent to your email)
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Verify Button */}
-                  <Pressable
-                    onPress={handleVerifyOTP}
-                    disabled={loading}
-                    style={{
-                      backgroundColor: '#3b82f6',
-                      borderRadius: 12,
-                      paddingVertical: 16,
-                      alignItems: 'center',
-                      marginBottom: 12,
-                    }}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="white" />
-                    ) : (
-                      <Text style={{ color: 'white', fontSize: 18, fontFamily: 'RubikBold' }}>
-                        Verify & Sign In
-                      </Text>
-                    )}
-                  </Pressable>
-
-                  {/* Back Button */}
-                  <Pressable
-                    onPress={() => {
-                      setShowOTP(false);
-                      setOtp('');
-                    }}
-                    style={{ alignItems: 'center' }}
-                  >
-                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'RubikRegular' }}>
-                      Back to Sign In
-                    </Text>
-                  </Pressable>
-                </>
-              )}
-            </View>
-
-            {/* Continue as Guest */}
+          <ScrollView
+            contentContainerStyle={{
+              flexGrow: 1,
+              justifyContent: 'center',
+              padding: 24,
+            }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Back Button */}
             <Pressable
-              onPress={() => router.replace('/(tabs)')}
-              style={{ marginTop: 24, alignItems: 'center' }}
+              onPress={() => router.back()}
+              style={{
+                position: 'absolute',
+                top: 16,
+                left: 0,
+                padding: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'RubikRegular' }}>
-                Continue as Guest
+              <Ionicons name="arrow-back" size={22} color="white" />
+              <Text style={{ color: 'white', marginLeft: 4, fontFamily: 'RubikMedium' }}>
+                Back
               </Text>
             </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </LinearGradient>
-  );
-};
 
-export default SimpleSignInScreen;
+            {/* Logo & Title */}
+            <View style={{ alignItems: 'center', marginBottom: 40 }}>
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 24,
+                  backgroundColor: 'rgba(59,130,246,0.2)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(59,130,246,0.4)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 20,
+                }}
+              >
+                <Ionicons name="trending-up" size={40} color="#60a5fa" />
+              </View>
+              <Text
+                style={{
+                  color: 'white',
+                  fontSize: 28,
+                  fontFamily: 'RubikBold',
+                  marginBottom: 8,
+                }}
+              >
+                Welcome Back
+              </Text>
+              <Text
+                style={{
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: 15,
+                  fontFamily: 'RubikRegular',
+                  textAlign: 'center',
+                }}
+              >
+                Sign in to access your portfolio{'\n'}and watchlist
+              </Text>
+            </View>
+
+            {/* Form Card */}
+            <View
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                borderRadius: 20,
+                padding: 24,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+              }}
+            >
+              {/* Email Input */}
+              <View style={{ marginBottom: 16 }}>
+                <Text
+                  style={{
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 13,
+                    fontFamily: 'RubikMedium',
+                    marginBottom: 8,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  EMAIL ADDRESS
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.15)',
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Ionicons name="mail-outline" size={20} color="rgba(255,255,255,0.5)" />
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={{
+                      flex: 1,
+                      color: 'white',
+                      paddingVertical: 14,
+                      paddingLeft: 12,
+                      fontFamily: 'RubikRegular',
+                      fontSize: 15,
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Password Input */}
+              <View style={{ marginBottom: 24 }}>
+                <Text
+                  style={{
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 13,
+                    fontFamily: 'RubikMedium',
+                    marginBottom: 8,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  PASSWORD
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.15)',
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.5)" />
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter your password"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    style={{
+                      flex: 1,
+                      color: 'white',
+                      paddingVertical: 14,
+                      paddingLeft: 12,
+                      fontFamily: 'RubikRegular',
+                      fontSize: 15,
+                    }}
+                  />
+                  <Pressable onPress={() => setShowPassword(!showPassword)}>
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="rgba(255,255,255,0.5)"
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Sign In Button */}
+              <Pressable
+                onPress={handleSignIn}
+                disabled={isLoading}
+                style={{ borderRadius: 12, overflow: 'hidden' }}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                  }}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="log-in-outline" size={20} color="white" />
+                      <Text
+                        style={{
+                          color: 'white',
+                          fontSize: 16,
+                          fontFamily: 'RubikBold',
+                          marginLeft: 8,
+                        }}
+                      >
+                        Sign In
+                      </Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </Pressable>
+            </View>
+
+            {/* Divider */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginVertical: 24,
+              }}
+            >
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+              <Text
+                style={{
+                  color: 'rgba(255,255,255,0.4)',
+                  marginHorizontal: 12,
+                  fontFamily: 'RubikRegular',
+                }}
+              >
+                Don't have an account?
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            </View>
+
+            {/* Sign Up Link */}
+            <Pressable
+              onPress={() => router.push('/auth/simple-signup')}
+              style={{
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: 'rgba(59,130,246,0.4)',
+                paddingVertical: 14,
+                alignItems: 'center',
+                backgroundColor: 'rgba(59,130,246,0.1)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#60a5fa',
+                  fontSize: 15,
+                  fontFamily: 'RubikBold',
+                }}
+              >
+                Create New Account
+              </Text>
+            </Pressable>
+
+            {/* Footer */}
+            <Text
+              style={{
+                color: 'rgba(255,255,255,0.3)',
+                textAlign: 'center',
+                marginTop: 24,
+                fontSize: 12,
+                fontFamily: 'RubikRegular',
+              }}
+            >
+              Your data is securely stored in the cloud ☁️
+            </Text>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </SafeAreaView>
+  );
+}

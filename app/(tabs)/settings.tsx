@@ -15,15 +15,15 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSimpleAuthStore } from '../store/simpleAuthStore';
+import { useAuthStore } from '../store/authStore';
 
 const SettingsScreen = () => {
-  const { currentUser, signOut, loadUsers } = useSimpleAuthStore();
+  // ✅ Changed from useSimpleAuthStore to useAuthStore
+  const { user, signOut } = useAuthStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
   useEffect(() => {
-    loadUsers();
     loadPreferences();
   }, []);
 
@@ -52,7 +52,6 @@ const SettingsScreen = () => {
   const handleDarkModeToggle = async (value: boolean) => {
     setDarkModeEnabled(value);
     await AsyncStorage.setItem('dark_mode_enabled', JSON.stringify(value));
-    // No Alert needed — UI instantly changes
   };
 
   const handleContactSupport = () => {
@@ -80,7 +79,7 @@ const SettingsScreen = () => {
       'Privacy Policy 🔒',
       'StockRadar Privacy Policy\n\n' +
         '1. We collect minimal data\n' +
-        '2. Your portfolio data is stored locally\n' +
+        '2. Your portfolio data is stored in secure cloud\n' +
         '3. We do not sell your data\n' +
         '4. Email is only used for authentication\n\n' +
         'Full policy available at:\nstockradar.com/privacy',
@@ -169,12 +168,10 @@ const SettingsScreen = () => {
     );
   };
 
-  // ✅ Dynamic gradient based on dark mode toggle
   const gradientColors = darkModeEnabled
     ? (['#0a0a0a', '#111827'] as const)
     : (['#00194b', '#0C0C0C'] as const);
 
-  // ✅ Dynamic card background based on dark mode
   const cardStyle = darkModeEnabled
     ? { backgroundColor: '#1f2937' }
     : { backgroundColor: 'white' };
@@ -198,14 +195,7 @@ const SettingsScreen = () => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Settings</Text>
-          {/* Dark mode indicator badge */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginTop: 4,
-            }}
-          >
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
             <Ionicons
               name={darkModeEnabled ? 'moon' : 'sunny'}
               size={14}
@@ -226,58 +216,48 @@ const SettingsScreen = () => {
 
         {/* Account Security Section */}
         <View style={styles.section}>
-          {currentUser ? (
+          {/* ✅ Changed currentUser to user */}
+          {user ? (
             <View style={[styles.card, cardStyle]}>
               <Text style={[styles.sectionTitle, { color: cardTextColor }]}>
                 🔐 Account Security
               </Text>
 
-              <View
-                style={[
-                  styles.infoRow,
-                  { borderBottomColor: cardBorderColor },
-                ]}
-              >
+              <View style={[styles.infoRow, { borderBottomColor: cardBorderColor }]}>
                 <Text style={[styles.infoLabel, { color: cardTextColor }]}>
                   Email
                 </Text>
+                {/* ✅ Changed currentUser.email to user.email */}
                 <Text
                   style={[styles.infoValue, { color: cardTextColor }]}
                   numberOfLines={1}
                 >
-                  {currentUser.email}
+                  {user.email}
                 </Text>
               </View>
 
-              <View
-                style={[
-                  styles.twoFARow,
-                  { borderBottomColor: cardBorderColor },
-                ]}
-              >
+              <View style={[styles.twoFARow, { borderBottomColor: cardBorderColor }]}>
                 <View style={styles.flex1}>
                   <Text style={[styles.twoFATitle, { color: cardTextColor }]}>
-                    Email-Based 2FA
+                    Supabase Auth
                   </Text>
-                  <Text
-                    style={[
-                      styles.twoFASubtitle,
-                      { color: cardSubTextColor },
-                    ]}
-                  >
-                    {currentUser.is2FAEnabled
-                      ? 'Enabled ✅'
-                      : 'Protect your account'}
+                  <Text style={[styles.twoFASubtitle, { color: cardSubTextColor }]}>
+                    Secured ✅ — Cloud protected
                   </Text>
                 </View>
-                {!currentUser.is2FAEnabled && (
-                  <Pressable
-                    onPress={() => router.push('/auth/simple-enable-2fa')}
-                    style={styles.enableButton}
-                  >
-                    <Text style={styles.enableButtonText}>Enable</Text>
-                  </Pressable>
-                )}
+                {/* ✅ Removed 2FA button — Supabase handles auth security */}
+                <View
+                  style={{
+                    backgroundColor: 'rgba(34,197,94,0.15)',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ color: '#22c55e', fontFamily: 'RubikBold', fontSize: 12 }}>
+                    Active ✅
+                  </Text>
+                </View>
               </View>
 
               <Pressable
@@ -318,8 +298,10 @@ const SettingsScreen = () => {
                   🔐 Secure Your Account
                 </Text>
                 <Text style={styles.secureAccountText}>
-                  • Simple email-based 2FA{'\n'}• No phone required{'\n'}• Free
-                  & secure{'\n'}• Easy setup
+                  • Simple email-based auth{'\n'}
+                  • Cloud data storage{'\n'}
+                  • Free & secure{'\n'}
+                  • Easy setup
                 </Text>
                 <View style={styles.createAccountButton}>
                   <Text style={styles.createAccountButtonText}>
@@ -335,19 +317,14 @@ const SettingsScreen = () => {
         <View style={styles.section}>
           <View style={[styles.card, cardStyle]}>
             <View style={styles.cardHeader}>
-              <Text
-                style={[styles.cardHeaderTitle, { color: cardTextColor }]}
-              >
+              <Text style={[styles.cardHeaderTitle, { color: cardTextColor }]}>
                 Preferences
               </Text>
             </View>
 
             {/* Notifications Toggle */}
             <Pressable
-              style={[
-                styles.preferenceRow,
-                { borderBottomColor: cardBorderColor },
-              ]}
+              style={[styles.preferenceRow, { borderBottomColor: cardBorderColor }]}
             >
               <View style={styles.preferenceRowLeft}>
                 <View
@@ -361,33 +338,17 @@ const SettingsScreen = () => {
                   ]}
                 >
                   <Ionicons
-                    name={
-                      notificationsEnabled
-                        ? 'notifications'
-                        : 'notifications-off-outline'
-                    }
+                    name={notificationsEnabled ? 'notifications' : 'notifications-off-outline'}
                     size={20}
                     color={notificationsEnabled ? '#22c55e' : '#9ca3af'}
                   />
                 </View>
                 <View style={styles.preferenceRowText}>
-                  <Text
-                    style={[
-                      styles.preferenceRowTitle,
-                      { color: cardTextColor },
-                    ]}
-                  >
+                  <Text style={[styles.preferenceRowTitle, { color: cardTextColor }]}>
                     Push Notifications
                   </Text>
-                  <Text
-                    style={[
-                      styles.preferenceRowSubtitle,
-                      { color: cardSubTextColor },
-                    ]}
-                  >
-                    {notificationsEnabled
-                      ? 'Alerts enabled 🔔'
-                      : 'Alerts muted 🔕'}
+                  <Text style={[styles.preferenceRowSubtitle, { color: cardSubTextColor }]}>
+                    {notificationsEnabled ? 'Alerts enabled 🔔' : 'Alerts muted 🔕'}
                   </Text>
                 </View>
               </View>
@@ -419,20 +380,10 @@ const SettingsScreen = () => {
                   />
                 </View>
                 <View style={styles.preferenceRowText}>
-                  <Text
-                    style={[
-                      styles.preferenceRowTitle,
-                      { color: cardTextColor },
-                    ]}
-                  >
+                  <Text style={[styles.preferenceRowTitle, { color: cardTextColor }]}>
                     Dark Mode
                   </Text>
-                  <Text
-                    style={[
-                      styles.preferenceRowSubtitle,
-                      { color: cardSubTextColor },
-                    ]}
-                  >
+                  <Text style={[styles.preferenceRowSubtitle, { color: cardSubTextColor }]}>
                     {darkModeEnabled ? 'Enabled 🌙' : 'Disabled ☀️'}
                   </Text>
                 </View>
@@ -451,9 +402,7 @@ const SettingsScreen = () => {
         <View style={styles.section}>
           <View style={[styles.card, cardStyle]}>
             <View style={styles.cardHeader}>
-              <Text
-                style={[styles.cardHeaderTitle, { color: cardTextColor }]}
-              >
+              <Text style={[styles.cardHeaderTitle, { color: cardTextColor }]}>
                 About
               </Text>
             </View>
@@ -506,27 +455,17 @@ const SettingsScreen = () => {
                 ]}
               >
                 <View style={styles.menuRowLeft}>
-                  <Ionicons
-                    name={item.icon as any}
-                    size={22}
-                    color={item.color}
-                  />
+                  <Ionicons name={item.icon as any} size={22} color={item.color} />
                   <Text
                     style={[
                       styles.menuRowText,
-                      {
-                        color: item.isLast ? '#ef4444' : cardTextColor,
-                      },
+                      { color: item.isLast ? '#ef4444' : cardTextColor },
                     ]}
                   >
                     {item.label}
                   </Text>
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={cardSubTextColor}
-                />
+                <Ionicons name="chevron-forward" size={20} color={cardSubTextColor} />
               </Pressable>
             ))}
           </View>
@@ -646,9 +585,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'RubikBold',
   },
-  cardHeader: {
-    paddingBottom: 8,
-  },
+  cardHeader: { paddingBottom: 8 },
   cardHeaderTitle: {
     fontSize: 18,
     fontFamily: 'RubikBold',

@@ -1,242 +1,452 @@
+// app/auth/simple-signup.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { useSimpleAuthStore } from '../store/simpleAuthStore';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuthStore } from '../store/authStore';
 
-const SimpleSignUpScreen = () => {
+export default function SignUpScreen() {
+  const { signUp } = useAuthStore();
+
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const { signUp } = useSimpleAuthStore();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSignUp = async () => {
-    if (!email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill all fields');
+    if (!fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+      Alert.alert('⚠️ Missing Fields', 'Please fill in all fields');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert('❌ Password Mismatch', 'Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert('⚠️ Weak Password', 'Password must be at least 6 characters');
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email');
+    setIsLoading(true);
+    const { error } = await signUp(
+      email.trim().toLowerCase(),
+      password,
+      fullName.trim()
+    );
+    setIsLoading(false);
+
+    if (error) {
+      Alert.alert('❌ Sign Up Failed', error);
       return;
     }
 
-    setLoading(true);
-    try {
-      await signUp(email, password);
-      Alert.alert('Success! 🎉', 'Account created successfully!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
-      ]);
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    } finally {
-      setLoading(false);
-    }
+    Alert.alert(
+      '✅ Account Created!',
+      'Welcome to StockRadar! Your account has been created and you have $100,000 virtual cash to start trading!',
+      [{ text: 'Start Trading 🚀', onPress: () => router.replace('/(tabs)') }]
+    );
   };
 
   return (
-    <LinearGradient
-      colors={['#00194b', '#0C0C0C']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={{ flex: 1 }}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={['#00194b', '#0C0C0C']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
         style={{ flex: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
         >
-          <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
-            {/* Header */}
+          <ScrollView
+            contentContainerStyle={{
+              flexGrow: 1,
+              justifyContent: 'center',
+              padding: 24,
+            }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Back Button */}
+            <Pressable
+              onPress={() => router.back()}
+              style={{
+                position: 'absolute',
+                top: 16,
+                left: 0,
+                padding: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons name="arrow-back" size={22} color="white" />
+              <Text style={{ color: 'white', marginLeft: 4, fontFamily: 'RubikMedium' }}>
+                Back
+              </Text>
+            </Pressable>
+
+            {/* Logo & Title */}
             <View style={{ alignItems: 'center', marginBottom: 32 }}>
-              <Text style={{ color: 'white', fontSize: 36, marginBottom: 8, fontFamily: 'RubikBold' }}>
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 24,
+                  backgroundColor: 'rgba(16,185,129,0.2)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(16,185,129,0.4)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 20,
+                }}
+              >
+                <Ionicons name="person-add" size={40} color="#34d399" />
+              </View>
+              <Text
+                style={{
+                  color: 'white',
+                  fontSize: 28,
+                  fontFamily: 'RubikBold',
+                  marginBottom: 8,
+                }}
+              >
                 Create Account
               </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, fontFamily: 'RubikRegular' }}>
-                Simple & Secure
+              <Text
+                style={{
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: 15,
+                  fontFamily: 'RubikRegular',
+                  textAlign: 'center',
+                }}
+              >
+                Start with $100,000 virtual cash{'\n'}and trade like a pro 📈
               </Text>
             </View>
 
-            {/* Form Container */}
-            <View style={{ 
-              backgroundColor: 'rgba(255,255,255,0.1)', 
-              borderRadius: 16, 
-              padding: 24 
-            }}>
-              {/* Email Input */}
+            {/* Form Card */}
+            <View
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                borderRadius: 20,
+                padding: 24,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+              }}
+            >
+              {/* Full Name */}
               <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: 'white', marginBottom: 8, fontFamily: 'RubikMedium' }}>
-                  Email Address
+                <Text
+                  style={{
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 13,
+                    fontFamily: 'RubikMedium',
+                    marginBottom: 8,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  FULL NAME
                 </Text>
-                <View style={{ 
-                  backgroundColor: 'rgba(255,255,255,0.2)', 
-                  borderRadius: 12, 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  paddingHorizontal: 16 
-                }}>
-                  <Ionicons name="mail-outline" size={20} color="white" />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.15)',
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Ionicons name="person-outline" size={20} color="rgba(255,255,255,0.5)" />
                   <TextInput
-                    style={{ 
-                      flex: 1, 
-                      paddingVertical: 16, 
-                      paddingHorizontal: 12, 
+                    value={fullName}
+                    onChangeText={setFullName}
+                    placeholder="Your full name"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    autoCapitalize="words"
+                    style={{
+                      flex: 1,
                       color: 'white',
-                      fontFamily: 'RubikRegular'
+                      paddingVertical: 14,
+                      paddingLeft: 12,
+                      fontFamily: 'RubikRegular',
+                      fontSize: 15,
                     }}
-                    placeholder="your@email.com"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
                   />
                 </View>
               </View>
 
-              {/* Password Input */}
+              {/* Email */}
               <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: 'white', marginBottom: 8, fontFamily: 'RubikMedium' }}>
-                  Password
+                <Text
+                  style={{
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 13,
+                    fontFamily: 'RubikMedium',
+                    marginBottom: 8,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  EMAIL ADDRESS
                 </Text>
-                <View style={{ 
-                  backgroundColor: 'rgba(255,255,255,0.2)', 
-                  borderRadius: 12, 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  paddingHorizontal: 16 
-                }}>
-                  <Ionicons name="lock-closed-outline" size={20} color="white" />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.15)',
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Ionicons name="mail-outline" size={20} color="rgba(255,255,255,0.5)" />
                   <TextInput
-                    style={{ 
-                      flex: 1, 
-                      paddingVertical: 16, 
-                      paddingHorizontal: 12, 
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={{
+                      flex: 1,
                       color: 'white',
-                      fontFamily: 'RubikRegular'
+                      paddingVertical: 14,
+                      paddingLeft: 12,
+                      fontFamily: 'RubikRegular',
+                      fontSize: 15,
                     }}
-                    placeholder="Enter password"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
+                  />
+                </View>
+              </View>
+
+              {/* Password */}
+              <View style={{ marginBottom: 16 }}>
+                <Text
+                  style={{
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 13,
+                    fontFamily: 'RubikMedium',
+                    marginBottom: 8,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  PASSWORD
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.15)',
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.5)" />
+                  <TextInput
                     value={password}
                     onChangeText={setPassword}
+                    placeholder="Min 6 characters"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
                     secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    style={{
+                      flex: 1,
+                      color: 'white',
+                      paddingVertical: 14,
+                      paddingLeft: 12,
+                      fontFamily: 'RubikRegular',
+                      fontSize: 15,
+                    }}
                   />
                   <Pressable onPress={() => setShowPassword(!showPassword)}>
                     <Ionicons
-                      name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                       size={20}
-                      color="white"
+                      color="rgba(255,255,255,0.5)"
                     />
                   </Pressable>
                 </View>
               </View>
 
-              {/* Confirm Password Input */}
+              {/* Confirm Password */}
               <View style={{ marginBottom: 24 }}>
-                <Text style={{ color: 'white', marginBottom: 8, fontFamily: 'RubikMedium' }}>
-                  Confirm Password
+                <Text
+                  style={{
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 13,
+                    fontFamily: 'RubikMedium',
+                    marginBottom: 8,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  CONFIRM PASSWORD
                 </Text>
-                <View style={{ 
-                  backgroundColor: 'rgba(255,255,255,0.2)', 
-                  borderRadius: 12, 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  paddingHorizontal: 16 
-                }}>
-                  <Ionicons name="lock-closed-outline" size={20} color="white" />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: confirmPassword && password !== confirmPassword
+                      ? 'rgba(239,68,68,0.5)'
+                      : 'rgba(255,255,255,0.15)',
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Ionicons
+                    name="shield-checkmark-outline"
+                    size={20}
+                    color={
+                      confirmPassword && password !== confirmPassword
+                        ? '#ef4444'
+                        : 'rgba(255,255,255,0.5)'
+                    }
+                  />
                   <TextInput
-                    style={{ 
-                      flex: 1, 
-                      paddingVertical: 16, 
-                      paddingHorizontal: 12, 
-                      color: 'white',
-                      fontFamily: 'RubikRegular'
-                    }}
-                    placeholder="Confirm password"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
-                    secureTextEntry={!showPassword}
+                    placeholder="Re-enter password"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    secureTextEntry={!showConfirm}
+                    autoCapitalize="none"
+                    style={{
+                      flex: 1,
+                      color: 'white',
+                      paddingVertical: 14,
+                      paddingLeft: 12,
+                      fontFamily: 'RubikRegular',
+                      fontSize: 15,
+                    }}
                   />
+                  <Pressable onPress={() => setShowConfirm(!showConfirm)}>
+                    <Ionicons
+                      name={showConfirm ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="rgba(255,255,255,0.5)"
+                    />
+                  </Pressable>
                 </View>
+                {confirmPassword && password !== confirmPassword && (
+                  <Text
+                    style={{
+                      color: '#ef4444',
+                      fontSize: 12,
+                      fontFamily: 'RubikRegular',
+                      marginTop: 4,
+                      marginLeft: 4,
+                    }}
+                  >
+                    Passwords do not match
+                  </Text>
+                )}
               </View>
 
               {/* Sign Up Button */}
               <Pressable
                 onPress={handleSignUp}
-                disabled={loading}
+                disabled={isLoading}
+                style={{ borderRadius: 12, overflow: 'hidden' }}
+              >
+                <LinearGradient
+                  colors={['#10b981', '#059669']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{
+                    paddingVertical: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                  }}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="rocket-outline" size={20} color="white" />
+                      <Text
+                        style={{
+                          color: 'white',
+                          fontSize: 16,
+                          fontFamily: 'RubikBold',
+                          marginLeft: 8,
+                        }}
+                      >
+                        Create Account & Start Trading
+                      </Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </Pressable>
+            </View>
+
+            {/* Sign In Link */}
+            <View style={{ marginTop: 24 }}>
+              <Pressable
+                onPress={() => router.push('/auth/simple-signin')}
                 style={{
-                  backgroundColor: '#3b82f6',
                   borderRadius: 12,
-                  paddingVertical: 16,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.15)',
+                  paddingVertical: 14,
                   alignItems: 'center',
-                  marginBottom: 16,
                 }}
               >
-                {loading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={{ color: 'white', fontSize: 18, fontFamily: 'RubikBold' }}>
-                    Create Account
-                  </Text>
-                )}
-              </Pressable>
-
-              {/* Sign In Link */}
-              <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'RubikRegular' }}>
+                <Text
+                  style={{
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 15,
+                    fontFamily: 'RubikMedium',
+                  }}
+                >
                   Already have an account?{' '}
-                </Text>
-                <Pressable onPress={() => router.push('../auth/simple-signin')}>
                   <Text style={{ color: '#60a5fa', fontFamily: 'RubikBold' }}>
                     Sign In
                   </Text>
-                </Pressable>
-              </View>
+                </Text>
+              </Pressable>
             </View>
 
-            {/* Continue as Guest */}
-            <Pressable
-              onPress={() => router.replace('/(tabs)')}
-              style={{ marginTop: 24, alignItems: 'center' }}
+            {/* Footer */}
+            <Text
+              style={{
+                color: 'rgba(255,255,255,0.3)',
+                textAlign: 'center',
+                marginTop: 16,
+                fontSize: 12,
+                fontFamily: 'RubikRegular',
+              }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'RubikRegular' }}>
-                Continue as Guest
-              </Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+              🔒 Secured by Supabase • Data stored in cloud
+            </Text>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </SafeAreaView>
   );
-};
-
-export default SimpleSignUpScreen;
+}

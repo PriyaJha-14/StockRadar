@@ -2,48 +2,27 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useEffect } from 'react';
-import { useChatStore } from '../store/chatStore';
+import { useAuthStore } from '../store/authStore';
 import { usePortfolioStore } from '../store/portfolioStore';
-import { useSimpleAuthStore } from '../store/simpleAuthStore';
 import { useWatchlistStore } from '../store/watchlistStore';
 
 export default function TabLayout() {
-  const { loadUsers, currentUser } = useSimpleAuthStore();
-  
-  // ✅ Load users on app start
+  const { user } = useAuthStore();
+
+  // ✅ Load user data when user logs in
   useEffect(() => {
-    console.log('🚀 App started, loading users...');
-    loadUsers();
-  }, []);
-  
-  // ✅ Load user-specific data when user logs in
-  useEffect(() => {
-    if (currentUser) {
-      console.log('👤 User logged in:', currentUser.email);
-      console.log('📂 Loading user data...');
-      
-      // Load portfolio data
-      const { holdings, virtualCash } = usePortfolioStore.getState();
-      usePortfolioStore.setState({
-        holdings: currentUser.portfolio || [],
-        virtualCash: currentUser.virtualCash || 100000,
-      });
-      
-      // Load watchlist data
-      useWatchlistStore.setState({
-        stocks: currentUser.watchlist || [],
-      });
-      
-      // Load chat history
-      useChatStore.setState({
-        messages: currentUser.chatHistory || [],
-      });
-      
-      console.log('✅ User data loaded successfully');
+    if (user?.id) {
+      console.log('👤 User logged in:', user.email);
+
+      // Load from Supabase cloud
+      usePortfolioStore.getState().loadFromCloud(user.id);
+      useWatchlistStore.getState().loadFromCloud(user.id);
+
+      console.log('✅ Loading user data from cloud...');
     } else {
       console.log('👤 No user logged in (Guest mode)');
     }
-  }, [currentUser]);
+  }, [user?.id]);
 
   return (
     <Tabs
@@ -55,7 +34,7 @@ export default function TabLayout() {
           backgroundColor: "#0C0C0C",
           borderTopColor: "#1f2937",
           borderTopWidth: 1,
-          height: 80, 
+          height: 80,
           paddingBottom: 20,
           paddingTop: 10,
         },

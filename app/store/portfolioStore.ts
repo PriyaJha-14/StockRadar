@@ -1,10 +1,11 @@
 // app/store/portfolioStore.ts
+import { supabase } from "@/utils/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { Alert } from "react-native";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { useSimpleAuthStore } from "./simpleAuthStore";
+import { useAuthStore } from "./authStore";
 
 export interface PortfolioHolding {
   id: string;
@@ -19,7 +20,7 @@ export interface PortfolioHolding {
 interface PortfolioStore {
   holdings: PortfolioHolding[];
   virtualCash: number;
-  
+  isLoading: boolean;
   addHolding: (holding: Omit<PortfolioHolding, "id" | "buyDate">) => void;
   buyStock: (symbol: string, quantity: number, price: number, companyName?: string) => boolean;
   removeHolding: (id: string) => void;
@@ -31,20 +32,21 @@ interface PortfolioStore {
   getPortfolioSummary: () => string;
   clearPortfolio: () => void;
   loadUserPortfolio: () => void;
+  loadFromCloud: (userId: string) => Promise<void>;
 }
 
 // Auth check helper
 const checkAuth = () => {
-  const { isAuthenticated } = useSimpleAuthStore.getState();
+  const { isAuthenticated } = useAuthStore.getState();
   if (!isAuthenticated) {
     Alert.alert(
       '🔒 Sign In Required',
       'You need to sign in to buy/sell stocks and save your portfolio',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign In', 
-          onPress: () => router.push('/auth/simple-signin') 
+        {
+          text: 'Sign In',
+          onPress: () => router.push('/auth/simple-signin')
         },
       ]
     );
@@ -58,9 +60,9 @@ export const usePortfolioStore = create<PortfolioStore>()(
     (set, get) => ({
       holdings: [],
       virtualCash: 100000,
+      isLoading: false,
 
-      buyStock: (symbol, quantity, price, companyName = symbol) => {
-        // ✅ Check authentication first
+      buyStock: async (symbol, quantity, price, companyName = symbol) => {
         if (!checkAuth()) return false;
 
         const cost = quantity * price;
@@ -75,10 +77,12 @@ export const usePortfolioStore = create<PortfolioStore>()(
         }
 
         const existingHolding = holdings.find(h => h.symbol === symbol);
+        const { user } = useAuthStore.getState();
 
         if (existingHolding) {
           const totalQuantity = existingHolding.quantity + quantity;
-          const totalCost = (existingHolding.buyPrice * existingHolding.quantity) + cost;
+          const totalCost =
+            existingHolding.buyPrice * existingHolding.quantity + cost;
           const newAvgPrice = totalCost / totalQuantity;
 
           const updatedHoldings = holdings.map(h =>
@@ -92,20 +96,17 @@ export const usePortfolioStore = create<PortfolioStore>()(
             virtualCash: virtualCash - cost,
           });
 
-          // ✅ Sync to user account
-          const { currentUser, updatePortfolio, updateVirtualCash, addTrade } = 
-            useSimpleAuthStore.getState();
-          
-          if (currentUser) {
-            updatePortfolio(updatedHoldings);
-            updateVirtualCash(virtualCash - cost);
-            addTrade({
-              type: 'BUY',
-              symbol,
-              quantity,
-              price,
-              timestamp: new Date().toISOString(),
-            });
+          // ✅ Update in Supabase
+          if (user?.id) {
+            await supabase
+              .from('portfolio')
+              .update({ quantity: totalQuantity, buy_price: newAvgPrice })
+              .eq('user_id', user.id)
+              .eq('symbol', symbol);
+
+            await supabase
+              .from('virtual_cash')
+              .upsert({ user_id: user.id, cash: virtualCash - cost });
           }
         } else {
           const newHolding: PortfolioHolding = {
@@ -125,20 +126,19 @@ export const usePortfolioStore = create<PortfolioStore>()(
             virtualCash: virtualCash - cost,
           });
 
-          // ✅ Sync to user account
-          const { currentUser, updatePortfolio, updateVirtualCash, addTrade } = 
-            useSimpleAuthStore.getState();
-          
-          if (currentUser) {
-            updatePortfolio(updatedHoldings);
-            updateVirtualCash(virtualCash - cost);
-            addTrade({
-              type: 'BUY',
+          // ✅ Insert in Supabase
+          if (user?.id) {
+            await supabase.from('portfolio').insert({
+              user_id: user.id,
               symbol,
+              company_name: companyName,
               quantity,
-              price,
-              timestamp: new Date().toISOString(),
+              buy_price: price,
             });
+
+            await supabase
+              .from('virtual_cash')
+              .upsert({ user_id: user.id, cash: virtualCash - cost });
           }
         }
 
@@ -146,11 +146,11 @@ export const usePortfolioStore = create<PortfolioStore>()(
           '✅ Purchase Successful',
           `Bought ${quantity} shares of ${symbol} at $${price.toFixed(2)}`
         );
-        console.log("✅ Bought stock:", symbol, quantity, "@", price);
+        console.log('✅ Bought stock:', symbol, quantity, '@', price);
         return true;
       },
 
-      addHolding: (holding) => {
+      addHolding: async (holding) => {
         if (!checkAuth()) return;
 
         const cost = holding.quantity * holding.buyPrice;
@@ -174,48 +174,64 @@ export const usePortfolioStore = create<PortfolioStore>()(
           virtualCash: virtualCash - cost,
         });
 
-        // Sync to user account
-        const { currentUser, updatePortfolio, updateVirtualCash } = 
-          useSimpleAuthStore.getState();
-        
-        if (currentUser) {
-          updatePortfolio(updatedHoldings);
-          updateVirtualCash(virtualCash - cost);
+        // ✅ Save to Supabase
+        const { user } = useAuthStore.getState();
+        if (user?.id) {
+          await supabase.from('portfolio').insert({
+            user_id: user.id,
+            symbol: holding.symbol,
+            company_name: holding.companyName,
+            quantity: holding.quantity,
+            buy_price: holding.buyPrice,
+          });
+
+          await supabase
+            .from('virtual_cash')
+            .upsert({ user_id: user.id, cash: virtualCash - cost });
         }
 
-        console.log("✅ Added holding:", newHolding.symbol);
+        console.log('✅ Added holding:', newHolding.symbol);
       },
 
-      removeHolding: (id) => {
+      removeHolding: async (id) => {
         if (!checkAuth()) return;
 
+        const holding = get().holdings.find(h => h.id === id);
         const updatedHoldings = get().holdings.filter((h) => h.id !== id);
         set({ holdings: updatedHoldings });
 
-        // Sync to user account
-        const { currentUser, updatePortfolio } = useSimpleAuthStore.getState();
-        if (currentUser) {
-          updatePortfolio(updatedHoldings);
+        // ✅ Delete from Supabase
+        const { user } = useAuthStore.getState();
+        if (user?.id && holding) {
+          await supabase
+            .from('portfolio')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('symbol', holding.symbol);
         }
       },
 
-      updateHolding: (id, quantity) => {
+      updateHolding: async (id, quantity) => {
         if (!checkAuth()) return;
 
         const updatedHoldings = get().holdings.map((h) =>
           h.id === id ? { ...h, quantity } : h
         );
-        
         set({ holdings: updatedHoldings });
 
-        // Sync to user account
-        const { currentUser, updatePortfolio } = useSimpleAuthStore.getState();
-        if (currentUser) {
-          updatePortfolio(updatedHoldings);
+        // ✅ Update in Supabase
+        const holding = get().holdings.find(h => h.id === id);
+        const { user } = useAuthStore.getState();
+        if (user?.id && holding) {
+          await supabase
+            .from('portfolio')
+            .update({ quantity })
+            .eq('user_id', user.id)
+            .eq('symbol', holding.symbol);
         }
       },
 
-      sellHolding: (id, quantity, sellPrice) => {
+      sellHolding: async (id, quantity, sellPrice) => {
         if (!checkAuth()) return;
 
         const { holdings, virtualCash } = get();
@@ -228,6 +244,7 @@ export const usePortfolioStore = create<PortfolioStore>()(
 
         const proceeds = quantity * sellPrice;
         const newQuantity = holding.quantity - quantity;
+        const newCash = virtualCash + proceeds;
 
         let updatedHoldings;
         if (newQuantity === 0) {
@@ -240,30 +257,36 @@ export const usePortfolioStore = create<PortfolioStore>()(
 
         set({
           holdings: updatedHoldings,
-          virtualCash: virtualCash + proceeds,
+          virtualCash: newCash,
         });
 
-        // Sync to user account
-        const { currentUser, updatePortfolio, updateVirtualCash, addTrade } = 
-          useSimpleAuthStore.getState();
-        
-        if (currentUser) {
-          updatePortfolio(updatedHoldings);
-          updateVirtualCash(virtualCash + proceeds);
-          addTrade({
-            type: 'SELL',
-            symbol: holding.symbol,
-            quantity,
-            price: sellPrice,
-            timestamp: new Date().toISOString(),
-          });
+        // ✅ Update Supabase
+        const { user } = useAuthStore.getState();
+        if (user?.id) {
+          if (newQuantity === 0) {
+            await supabase
+              .from('portfolio')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('symbol', holding.symbol);
+          } else {
+            await supabase
+              .from('portfolio')
+              .update({ quantity: newQuantity })
+              .eq('user_id', user.id)
+              .eq('symbol', holding.symbol);
+          }
+
+          await supabase
+            .from('virtual_cash')
+            .upsert({ user_id: user.id, cash: newCash });
         }
 
         Alert.alert(
           '✅ Sale Successful',
           `Sold ${quantity} shares for $${proceeds.toFixed(2)}`
         );
-        console.log("✅ Sold", quantity, "shares for $", proceeds);
+        console.log('✅ Sold', quantity, 'shares for $', proceeds);
       },
 
       updateCurrentPrices: (prices) => {
@@ -295,27 +318,27 @@ export const usePortfolioStore = create<PortfolioStore>()(
 
       getPortfolioSummary: () => {
         const { holdings, virtualCash } = get();
-        
+
         if (holdings.length === 0) {
           return "Portfolio is empty. No holdings to analyze.";
         }
 
         const totalValue = get().getPortfolioValue();
         const totalProfit = get().getTotalProfit();
-        
+
         let summary = `📊 Portfolio Analysis\n\n`;
         summary += `Total Portfolio Value: $${totalValue.toFixed(2)}\n`;
         summary += `Cash Available: $${virtualCash.toFixed(2)}\n`;
         summary += `Total Profit/Loss: ${totalProfit >= 0 ? '+' : ''}$${totalProfit.toFixed(2)}\n\n`;
         summary += `Holdings (${holdings.length} stocks):\n\n`;
-        
+
         holdings.forEach((h, index) => {
           const currentPrice = h.currentPrice || h.buyPrice;
           const currentValue = currentPrice * h.quantity;
           const costBasis = h.buyPrice * h.quantity;
           const profit = currentValue - costBasis;
           const profitPercent = ((profit / costBasis) * 100).toFixed(2);
-          
+
           summary += `${index + 1}. ${h.symbol} (${h.companyName})\n`;
           summary += `   - Quantity: ${h.quantity} shares\n`;
           summary += `   - Avg Buy Price: $${h.buyPrice.toFixed(2)}\n`;
@@ -323,27 +346,52 @@ export const usePortfolioStore = create<PortfolioStore>()(
           summary += `   - Total Value: $${currentValue.toFixed(2)}\n`;
           summary += `   - Profit/Loss: ${profit >= 0 ? '+' : ''}$${profit.toFixed(2)} (${profitPercent}%)\n\n`;
         });
-        
+
         return summary;
       },
 
       clearPortfolio: () => {
-        set({
-          holdings: [],
-          virtualCash: 100000,
-        });
+        set({ holdings: [], virtualCash: 100000 });
       },
 
-      // ✅ Load user's portfolio data
+      // ✅ Kept for backward compat
       loadUserPortfolio: () => {
-        const { currentUser } = useSimpleAuthStore.getState();
-        if (currentUser) {
-          set({
-            holdings: currentUser.portfolio || [],
-            virtualCash: currentUser.virtualCash || 100000,
-          });
-          console.log('📂 Loaded user portfolio');
+        const { user } = useAuthStore.getState();
+        if (user?.id) {
+          get().loadFromCloud(user.id);
         }
+      },
+
+      // ✅ Load from Supabase cloud
+      loadFromCloud: async (userId) => {
+        set({ isLoading: true });
+
+        const { data: portfolioData } = await supabase
+          .from('portfolio')
+          .select('*')
+          .eq('user_id', userId);
+
+        const { data: cashData } = await supabase
+          .from('virtual_cash')
+          .select('cash')
+          .eq('user_id', userId)
+          .single();
+
+        set({
+          holdings: portfolioData?.map((row: any) => ({
+            id: row.id,
+            symbol: row.symbol,
+            companyName: row.company_name,
+            quantity: row.quantity,
+            buyPrice: row.buy_price,
+            buyDate: new Date(row.bought_at),
+            currentPrice: row.buy_price,
+          })) || [],
+          virtualCash: cashData?.cash || 100000,
+          isLoading: false,
+        });
+
+        console.log('📂 Loaded portfolio from cloud');
       },
     }),
     {

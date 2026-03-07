@@ -3,8 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { useEffect } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect } from "react"; // ✅ added useCallback
 import {
   Alert,
   FlatList,
@@ -26,6 +26,7 @@ export default function PortfolioScreen() {
     getTotalProfit,
     getPortfolioSummary,
     updateCurrentPrices,
+    refreshCurrentPrices,                               // ✅ added
     sellHolding,
     clearPortfolio,
   } = usePortfolioStore();
@@ -34,16 +35,23 @@ export default function PortfolioScreen() {
 
   const symbols = holdings.map((h) => h.symbol);
 
-  // Fetch current prices
-  const { data: quotes, isLoading: isLoadingQuotes } = useQuery({
+  // ✅ NEW — Refresh live prices every time user opens Portfolio tab
+  useFocusEffect(
+    useCallback(() => {
+      refreshCurrentPrices();
+    }, [])
+  );
+
+  // Fetch current prices via react-query (keeps existing logic)
+  const { data: quotes } = useQuery({
     queryKey: ["portfolio-quotes", symbols],
     queryFn: () => fetchStockQuotes(symbols),
     enabled: symbols.length > 0,
-    refetchInterval: 60000, // 1 minute
+    refetchInterval: 60000,
     staleTime: 1000 * 60 * 2,
   });
 
-  // Update prices when quotes arrive
+  // Update prices when react-query quotes arrive
   useEffect(() => {
     if (quotes?.body) {
       const priceMap: Record<string, number> = {};
@@ -58,7 +66,6 @@ export default function PortfolioScreen() {
   const totalProfit = getTotalProfit();
   const profitPercentage = ((totalProfit / 100000) * 100).toFixed(2);
 
-  // ✅ FIXED: Handle AI Portfolio Analysis
   const handleAnalyzePortfolio = () => {
     if (holdings.length === 0) {
       Alert.alert(
@@ -67,13 +74,8 @@ export default function PortfolioScreen() {
       );
       return;
     }
-
     const portfolioSummary = getPortfolioSummary();
-    
-    // ✅ FIXED: setContext expects a string, not an object
     setContext(portfolioSummary);
-
-    // Navigate to AI Chat
     router.push("/(tabs)/ai-chat");
   };
 
@@ -278,19 +280,13 @@ export default function PortfolioScreen() {
                 </View>
               </View>
 
-              {/* ✅ Analyze Portfolio Button */}
               <Pressable
                 onPress={handleAnalyzePortfolio}
                 className="bg-white rounded-xl p-3 flex-row items-center justify-center"
               >
                 <View className="w-6 h-6 mr-2">
                   <Image
-                    style={{
-                      flex: 1,
-                      width: "100%",
-                      height: "100%",
-                      borderRadius: 6,
-                    }}
+                    style={{ flex: 1, width: "100%", height: "100%", borderRadius: 6 }}
                     source={require("../../assets/images/logo.png")}
                     placeholder={{ blurhash }}
                     contentFit="contain"

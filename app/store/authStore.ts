@@ -23,31 +23,39 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   isAuthenticated: false,
 
-  // ✅ SIGNUP
+  // ✅ SIGNUP — trigger handles profile + cash creation automatically
   signUp: async (email, password, fullName) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: fullName },
+          data: { full_name: fullName }, // trigger reads this for full_name
         },
       });
 
       if (error) return { error: error.message };
 
       if (data.user) {
-        // Update profile with full name
-        await supabase
+        // Small delay to let the trigger finish creating profile
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Fetch the auto-created profile
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .update({ full_name: fullName })
-          .eq('id', data.user.id);
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Profile fetch error:', profileError.message);
+        }
 
         set({
           user: {
             id: data.user.id,
             email: data.user.email!,
-            full_name: fullName,
+            full_name: profile?.full_name || fullName,
           },
           isAuthenticated: true,
         });
@@ -70,12 +78,27 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (error) return { error: error.message };
 
       if (data.user) {
-        // Load profile
-        const { data: profile } = await supabase
+        // Load profile from Supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
           .single();
+
+        if (profileError) {
+          console.error('Profile load error:', profileError.message);
+        }
+
+        // Load virtual cash balance (column is 'cash' not 'amount')
+        const { data: cashData, error: cashError } = await supabase
+          .from('virtual_cash')
+          .select('cash')
+          .eq('user_id', data.user.id)
+          .single();
+
+        if (cashError) {
+          console.error('Cash load error:', cashError.message);
+        }
 
         set({
           user: {
@@ -105,11 +128,27 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
-        const { data: profile } = await supabase
+        // Load profile
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .single();
+
+        if (profileError) {
+          console.error('Session profile load error:', profileError.message);
+        }
+
+        // Load virtual cash (column is 'cash' not 'amount')
+        const { data: cashData, error: cashError } = await supabase
+          .from('virtual_cash')
+          .select('cash')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (cashError) {
+          console.error('Session cash load error:', cashError.message);
+        }
 
         set({
           user: {
@@ -123,7 +162,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
       }
-    } catch {
+    } catch (err: any) {
+      console.error('Load session error:', err.message);
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
